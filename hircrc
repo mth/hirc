@@ -1,0 +1,46 @@
+Config {
+	host = "irc.datanet.ee",
+	port = 6667,
+	nick = "Hircb0t",
+	messages = [
+		("^!quit$", [Perm "root", Quit "Returning to hell..."]),
+		("^!reload$", [Perm "root", Rehash, Say "Rehashed."]),
+		("^(\\?\\?? .*|!\\? .*|!new$)",
+		 [Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
+		("^((!learn|!add|!brainwash|!bite|!forget) .*)",
+		 [Perm "dict", Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
+		("^!history +([^ ].*)", [Perm "dict", Exec "./history" ["base.dict", "$1"]]),
+		("^!seen *$", [RandLine "insult.txt"]),
+		("^!seen +([^ ]+)",
+			[Seen "$1" "$dp:$ht:$mm:$ss"
+					["Ei tea midagi $1'st",
+					 "$1 oli siin $2 tagasi ja ütles: $3",
+					 "$1 on praegu kanalil",
+					 "Ei, mind ei ole siin",
+					 "$0: Paraku oled sa ikka veel siin"]]),
+		("^!decide\\s+(\\S.*)$",
+		 [Exec "/usr/bin/perl" ["decide.pl", "$1"]]),
+		("^ilm!$", [Plugin ["/usr/bin/perl", "ilm.pl"] ""]),
+		("^!vera +(\\w+)", [Exec "./acrogrep" ["vera.txt", "$1"]]),
+		("^!help *$",
+ [Say "? ?? !? !add !bite !brainwash !forget !help !history !i-am-idiot !ilm !new !seen !vera"]),
+ 		("^!help +i-am-idiot *$", [Say "No cure for that"]),
+ 		("^!help +!i-am-idiot *$", [Say "Yes, you are."]),
+ 		("^!help +bite *$", [Say "Hammustab definitsioonil | saba ära"]),
+		("^Tuxaator_?[:,] ", [RandLine "talk.txt"]),
+		("^!tnick +(\\w+)", [Perm "root", Send "NICK" ["$1"]]),
+		("^\^AVERSION\^A$",
+			[Send "NOTICE" ["$0", "\^AVERSION HircB0t v0.0v\^A"]])
+	],
+	commands = [
+		("CONNECTED", [], [Join "#linux.ee"]),
+		("INVITE", ["", "^#hirctest$"], [Join "#hirctest"]),
+		("366", ["", "(.*)"], [SayTo "$1"  "Kurat, ma olen jälle siin..."])
+	],
+	permits = [
+		("root", ["*!~qwr@atsgw.cyber.ee"]),
+		("dict", ["*!~qwr@atsgw.cyber.ee",
+			  "mzz!mzz@uba.linux.ee"])
+	],
+	nopermit = [RandLine "insult.txt"]
+}

@@ -1,0 +1,6 @@
+$1: Jah
+$1: Ei
+$1: Võib-olla
+Mine magama, $1
+$1: Kindlasti
+$1: Ei huvita.
