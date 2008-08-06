@@ -18,21 +18,16 @@
  - along with HircBot.  If not, see <http://www.gnu.org/licenses/>.
  -}
 import Hirc
-import qualified Data.ByteString.Char8 as C
 import Data.Bits
 import Data.Char
 import Data.Maybe
 import Data.List
 import qualified Data.Map as M
 import qualified Data.HashTable as T
-import Control.Arrow
-import Control.Applicative
 import Control.Monad
 import Control.Concurrent
-import qualified Control.Exception as E
 import Text.Regex
 import System.Environment
-import System.Locale
 import System.Time
 import System.Random
 import System.Posix.Signals
@@ -40,7 +35,6 @@ import System.Process
 import System.IO
 import qualified Network.HTTP as H
 import Network.URI
-import Debug.Trace
 
 data EventSpec =
     Send String [String] | Say String | SayTo String String |
