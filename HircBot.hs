@@ -31,6 +31,7 @@ import Control.Monad
 import Control.Concurrent
 import qualified Control.Exception as E
 import Text.Regex
+import System.Environment
 import System.Locale
 import System.Time
 import System.Random
@@ -44,8 +45,8 @@ import Debug.Trace
 data EventSpec =
     Send String [String] | Say String | SayTo String String |
     Join String | Quit String | Perm String | RandLine String |
-    Seen String String [String] | Exec String [String] |
-    Plugin [String] String | Http String String Int String [EventSpec] |
+    Exec String [String] | Plugin [String] String |
+    Http String String Int String [EventSpec] |
     Append String String | Rehash
     deriving Read
 
@@ -72,8 +73,7 @@ data ConfigSt = ConfigSt {
     raw :: Config,
     patterns :: M.Map String [([Regex], [EventSpec])],
     perms :: M.Map String [AllowSpec],
-    seen  :: T.HashTable String (Integer, Bool, String, C.ByteString),
-    -- plugin is just a synchronized IO output, where to send matching commands
+    spoke :: T.HashTable String String,
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
@@ -156,94 +156,33 @@ execSys to prog argv =
 {-
  - SEEN
  -}
-splitEntry line =
-  case span (/= '\t') line of
-  (key, _:rest) -> (case span (/= '\t') rest of
-                    (value, _:hist) -> (key, value, hist)
-                    (value, _) -> (key, value, ""))
-  (key, _) -> (key, "", "")
-
-clockSeconds = getClockTime >>= \(TOD t _) -> return t
-
-readSeen =
-     do st <- T.new (==) T.hashString
-        let add l =
-                let l' = C.unpack l
-                    (nick, a, said) = splitEntry l' in
-                E.catch (do let t = read a
-                            t `seq` T.update st (lower nick)
-                                                (t, False, nick, C.pack said)
-                            return ())
-                        (\e -> putStrLn (show e ++ " (" ++ l' ++ ")"))
-        dat <- catch (C.readFile "seen.dat")
-                     (\e -> print e >> return C.empty)
-        mapM_ add (C.lines dat)
-        return st
-
-writeSeen alive nicks =
-     do st <- fmap seen ircConfig
-        liftIO $ do t <- clockSeconds
-                    let getSaid (_, _, _, said) = said
-                        add nick =
-                         do let key = lower nick
-                            said <- fmap (maybe C.empty getSaid)
-                                         (T.lookup st key)
-                            T.update st key (t, alive, nick, said)
-                    mapM_ add nicks
-                    T.toList st >>= writeFile "seen.dat" . foldl' line ""
-  where line r (_, (t, _, k, s)) = k ++ '\t':(show t) ++
-                                     '\t':(C.unpack s) ++ '\n':r
-
 seenMsg nick said =
-    do st <- fmap seen ircConfig
-       liftIO $ do let getTime (t, _, _, _) = return t
-                   t <- T.lookup st key >>= maybe clockSeconds getTime
-                   T.update st key (t, True, nick, C.pack said)
-                   return ()
-  where key = lower nick
+     do cfg <- ircConfig
+        liftIO (T.update (spoke cfg) (lower nick) said >> return ())
 
-updateSeen what nick _ = writeSeen what [nick]
+appendSeen :: [(String, Bool)] -> Bot ()
+appendSeen nicks =
+     do st <- fmap spoke ircConfig
+        TOD t' _ <- liftIO getClockTime
+        let t = show t'
+            format (nick, alive) =
+             let key = lower nick in
+             do said <- fmap (fromMaybe "") (T.lookup st key)
+                T.delete st key
+                return (nick ++ '\t':(if alive then '+':t else t) ++ '\t':said)
+        liftIO (mapM format nicks >>= appendFile "seen.dat" . unlines)
+
+updateSeen what nick _ = appendSeen [(nick, what)]
 seenEvent "JOIN" = updateSeen True
 seenEvent "PART" = updateSeen False
 seenEvent "QUIT" = updateSeen False
-seenEvent "NICK" = \old new -> writeSeen False [old] >> writeSeen True new
-seenEvent "353" = const $ writeSeen True . map stripTag . words . last
+seenEvent "NICK" = \old (new:_) -> appendSeen [(old, False), (new, True)]
+seenEvent "353" = const $ appendSeen . map stripTag . words . last
     where stripTag s@(c:t) =
-            if c == ' ' || c == '+' || c == '@' || c == '%' then t else s
-          stripTag s = s
+           (if c == ' ' || c == '+' || c == '@' || c == '%' then t else s, True)
+          stripTag s = (s, True)
 seenEvent _ = \_ _ -> return ()
 
-seenQuery :: String -> String -> String -> String -> [String] -> Bot ()
-seenQuery from to q format [unknown, hasBeen, here, mySelf, yourSelf] =
-    if q == "" then fail "NOPERM" else
-    case splitAt (length q - 1) (lower q) of
-    ('*':s, "*") -> find (isInfixOf s)
-    (s, "*") -> find (isPrefixOf s)
-    _ -> case lower q of
-         '*':q -> find (isSuffixOf q)
-         q -> ircConfig >>= liftIO . (`T.lookup` q) . seen
-                        >>= msg . fromMaybe none
-  where none = (0, False, "", C.empty)
-        find f = ircConfig >>= liftIO . T.toList . seen
-                           >>= msg . foldl' (chk f) none
-        chk f r@(t', _, _, _) (k, v@(t, _, _, _)) =
-            if t > t' && f k then v else r
-        msg (0, False, "", _) = say to (bindArg "" [from, q] unknown)
-        msg (t, a, k, said) =
-            do now <- liftIO clockSeconds
-               me <- myIrcNick
-               let said' = C.unpack said
-               say to (bindArg "" [from, k, ts (now - t),
-                                   if said' == "" then "N/A" else said']
-                                  (if not a then hasBeen
-                                   else if k == from then yourSelf
-                                   else if k == me then mySelf else here))
-        ts t = let f ('$':'d':s) = show (t `div` 86400) ++ f s
-                   f ('$':'h':s) = show (t `div` 3600 `mod` 24) ++ f s
-                   f ('$':'m':s) = show (t `div` 60 `mod` 60) ++ f s
-                   f ('$':'s':s) = show (t `mod` 60) ++ f s
-                   f (c:s) = c:f s
-                   f "" = "" in f format
 {-
  - PLUGIN
  -}
@@ -322,18 +261,13 @@ bot msg@(prefix, cmd, args') =
             Join channel  -> ircSend "" "JOIN" [param channel]
             Quit msg      -> quitIrc (param msg)
             RandLine fn   -> liftIO (randLine fn) >>= say replyTo . param
-            Rehash        -> do oldCfg <- ircConfig
-                                killPlugins
-                                cfg <- liftIO getConfig
-                                ircSetConfig cfg { seen = seen oldCfg }
+            Rehash        -> killPlugins >> liftIO getConfig >>= ircSetConfig
             Exec prg args -> execSys replyTo prg (map param args)
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
                 httpGet from (param uri) (param body) maxb
                         (mkRegexWithOpts pattern False False)
                         (\param -> mapM_ (execute param) events)
-            Seen nick format args ->
-                seenQuery from replyTo (param nick) format args
             Append file str -> liftIO $ appendFile file (param str)
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $ bindArg prefix [from, from]) . nopermit . raw
@@ -344,25 +278,25 @@ bot msg@(prefix, cmd, args') =
         from = takeWhile (/= '!') prefix
         args = map utfDecode args'
 
-getConfig = do s <- readFile "hircrc"
-               seen <- readSeen
-               return $! prepareConfig seen $! read (rmComments s)
+getConfig = do args <- getArgs
+               s <- readFile (fromMaybe "hircrc" $ listToMaybe args)
+               spoke <- T.new (==) T.hashString
+               return $! prepareConfig spoke $! read (rmComments s)
 
 rmComments = (flip $ subRegex (mkRegex "(^|\n)\\s*#[^\n]*")) ""
 
 preparePattern = subst "\\*" ".*" . subst "\\." "\\."
     where subst pattern text = (flip $ subRegex (mkRegex pattern)) text
 
-prepareConfig :: T.HashTable String (Integer, Bool, String, C.ByteString)
-                    -> Config -> ConfigSt
-prepareConfig seen cfg = ConfigSt {
+prepareConfig :: T.HashTable String String -> Config -> ConfigSt
+prepareConfig spoke cfg = ConfigSt {
     raw = cfg,
     patterns = foldr addCmd M.empty (commands cfg ++
                  map (\(pattern, event) -> ("PRIVMSG", ["", pattern], event))
                      (messages cfg)),
     perms = foldr addPerm M.empty (permits cfg),
     plugins = M.empty,
-    seen = seen
+    spoke = spoke
 } where addCmd (cmd, args, event) = let bind = (map mkRegex args, event) in
                                     M.alter (Just . maybe [bind] (bind:)) cmd
         addPerm (perm, users) = let perms = map getPerm users in
@@ -371,7 +305,9 @@ prepareConfig seen cfg = ConfigSt {
         getPerm user = Client (mkRegex ('^':preparePattern user ++ "$"))
 
 reconnect connect =
-    catch connect (\ex -> do putStrLn ("Error occured: " ++ show ex)
+    appendFile "seen.dat" "\n" >>
+    catch connect (\ex -> do putStrLn ("Reconnect after 1 min: Error occured: "
+                                       ++ show ex)
                              threadDelay 60000000
                              putStrLn "Reconnecting..."
                              reconnect connect)
