@@ -55,8 +55,8 @@ if ($r) {
 		my $t = int($t / 60);
 		my $h = $t % 24;
 		my $t = int($t / 24);
-		print
-		   "$r->[0] oli siin ${t}d ${h}h ${m}m ${s}s tagasi ja ütles: $r->[2]\n"
+		print ("$r->[0] oli siin ${t}d ${h}h ${m}m ${s}s tagasi" .
+				($r->[2] =~ /\S/ ? " ja ütles: $r->[2]" : "\n"))
 	}
 } else {
 	print "Ei tea midagi ${nick}'st\n"
