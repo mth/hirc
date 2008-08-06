@@ -11,7 +11,7 @@ Config {
 		 [Perm "dict", Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
 		("^!history +([^ ].*)", [Perm "dict", Exec "./history" ["base.dict", "$1"]]),
 		("^!seen *$", [RandLine "insult.txt"]),
-		("^!seen +([^ ]+)", [Exec "/usr/bin/perl" ["seen.pl", "$1", "$0"]]),
+		("^!seen +([^ ]+)", [Exec "/usr/bin/perl" ["seen.pl", "$0", "$1"]]),
 		("^!decide\\s+(\\S.*)$",
 		 [Exec "/usr/bin/perl" ["decide.pl", "$1"]]),
 		("^ilm!$", [Plugin ["/usr/bin/perl", "ilm.pl"] ""]),
