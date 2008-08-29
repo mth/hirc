@@ -91,7 +91,13 @@ while (<STDIN>) {
 	s/\s+$//s;
 	if ($cmd eq '?' || $cmd eq '??') {
 		if (my $def = $dict{lc $_}) {
+			my %cycle;
 			my ($key, $val) = @{$def};
+			while (not defined $cycle{$key} and
+			       $val =~ /^\?\??\s+(.*?)\s*$/ and ($def = $dict{lc $1})) {
+				($key, $val) = @{$def};
+				$cycle{$key} = 1;
+			}
 			print "$key = $val\n";
 		} else {
 			print "$_ ei eksisteeri\n"
