@@ -9,7 +9,7 @@ all: hirc acrogrep history
 acrogrep: acrogrep.c
 	cc -o $@ -W -O2 $+
 
-history: acrogrep.c
+history: history.c
 	cc -o $@ -W -O2 $+
 
 clean:
