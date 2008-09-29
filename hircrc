@@ -22,6 +22,10 @@ Config {
  		("^!help +!i-am-idiot *$", [Say "Yes, you are."]),
  		("^!help +bite *$", [Say "Hammustab definitsioonil | saba ära"]),
 		("^Tuxaator_?[:,] ", [RandLine "talk.txt"]),
+		("^!say\\s+(m8ga\\W*|T3EE\\W*)*(.*)$",
+		  [Perm "dict", SayTo "#linux.ee" "$2"]),
+		("^!emote\\s+(.*)$",
+		   [Perm "dict", SayTo "#linux.ee" "\^AACTION $1\^A"]),
 		("^!tnick +(\\w+)", [Perm "root", Send "NICK" ["$1"]]),
 		("^\^AVERSION\^A$",
 			[Send "NOTICE" ["$0", "\^AVERSION HircB0t v0.0v\^A"]])
