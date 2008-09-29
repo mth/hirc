@@ -1,4 +1,5 @@
 #!/usr/bin/perl
 
-@a = split /\s+/, $ARGV[0];
-print "hmm... ", $a[rand @a], "\n";
+$_ = shift;
+/\s+(?:või|ja)\s+|,/ ? split /\s+või\s+|,\s*/ : split /\s+/;
+print "hmm... ", $_[rand @_], "\n";
