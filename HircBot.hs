@@ -82,10 +82,22 @@ bindArg prefix bindings str =
          start ++ (if num < length bindings then bindings!!num else '$':numStr)
                ++ bindArg prefix bindings rest'
 
+randLine :: String -> IO String
 randLine fn =
      do l <- fmap lines (readFile fn)
         n <- randomRIO (0, length l - 1)
-        return $ l !! n
+        format (l !! n)
+  where format ('{':t) = snippet t "" []
+        format (c:t) = fmap (c:) (format t)
+        format "" = return ""
+        snippet ('|':t) a r = snippet t "" (reverse a : r)
+        snippet ('}':t) a r =
+             do let l = reverse a : r
+                n <- randomRIO (0, length l - 1)
+                rest <- format t
+                return $ (l !! n) ++ rest
+        snippet (c:t) a r = snippet t (c:a) r
+        snippet "" a r = snippet "}" a r -- someone forget to add '}'?
 
 dropPath p = if s == "" then p else dropPath (tail s)
   where s = dropWhile (/= '/') p
