@@ -117,7 +117,7 @@ while (<STDIN>) {
 			print "Mis $_?\n"
 		}
 	} elsif ($modify{$cmd}) {
-		if (/^((?:\w| |[^\x00-\x80])+?)\s*=\s*(\S.*)$/) {
+		if (/^((?:[\w+ -]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/) {
 			my $val;
 			if (my $def = $dict{lc $1}) {
 				(my $name, $val) = @{$def};
