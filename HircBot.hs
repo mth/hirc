@@ -62,12 +62,14 @@ data PluginId = ExecPlugin [String]
 data PluginCmd = PluginMsg String String | KillPlugin
 
 type Bot a = Irc ConfigSt a
+type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
 data ConfigSt = ConfigSt {
     raw :: Config,
-    patterns :: M.Map String [([Regex], [EventSpec])],
+    patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
     spoke :: T.HashTable String String,
+    ranks :: T.HashTable String Int,
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
@@ -178,15 +180,48 @@ appendSeen nicks =
                 return (nick ++ '\t':(if alive then '+':t else t) ++ '\t':said)
         liftIO (mapM format nicks >>= appendFile "seen.dat" . unlines)
 
-updateSeen what nick _ = appendSeen [(nick, what)]
+updateSeen what nick _ =
+     do appendSeen [(nick, what)]
+        unless what (ircConfig >>= liftIO . (`T.delete` nick) . ranks)
 seenEvent "JOIN" = updateSeen True
 seenEvent "PART" = updateSeen False
 seenEvent "QUIT" = updateSeen False
 seenEvent "NICK" = \old (new:_) -> appendSeen [(old, False), (new, True)]
-seenEvent "353" = const $ appendSeen . map stripTag . words . last
-    where stripTag s@(c:t) =
+seenEvent "KICK" = \_ args -> case args of
+                              (_:nick:_) -> updateSeen False nick []
+seenEvent "353" = const $ register . words . last
+  where stripTag s@(c:t) =
            (if c == ' ' || c == '+' || c == '@' || c == '%' then t else s, True)
-          stripTag s = (s, True)
+        stripTag s = (s, True)
+        modeRank '@' = 3
+        modeRank '%' = 2
+        modeRank '+' = 1
+        modeRank _ = 0
+        checkMode ranks (c:t) =
+            T.update ranks t (modeRank c) >> return ()
+        checkMode _ _ = return ()
+        register names =
+             do appendSeen (map stripTag names)
+                ircConfig >>= liftIO . (`mapM_` names) . checkMode . ranks
+-- track mode changes for maintaining ranks
+seenEvent "MODE" = const atMode
+  where atMode (_:m:args) = modes False m args
+        atMode _ = return ()
+        modes _ ('+':m) args = modes True m args
+        modes _ ('-':m) args = modes False m args
+        modes set (c:m) args = mode set c args >>= modes set m
+        modes _ _ _ = return ()
+        mode _ c (_:args) | elem c "belkIR" = return args
+        mode set c args'@(who:args) =
+            case elemIndex c "vho" of
+            Just rank -> do setRank who (if set then rank + 1 else 0)
+                            return args
+            Nothing -> return args'
+        mode _ _ _ = return []
+        setRank who rank =
+             do ranks <- fmap ranks ircConfig
+                putLog ("setRank " ++ who ++ " = " ++ show rank)
+                liftIO $ T.update ranks who rank
 seenEvent _ = \_ _ -> return ()
 
 {-
@@ -234,13 +269,25 @@ invokePlugin id to msg =
 {-
  - CORE
  -}
-requirePerm :: String -> String -> Bot ()
-requirePerm prefix perm =
+requirePerm :: String -> String -> String -> Bot ()
+requirePerm nick prefix perm =
      do cfg <- ircConfig
-        let hasPerm = maybe False (any checkPerm) . (`M.lookup` perms cfg)
-            checkPerm (Client re) = (matchRegex re prefix) /= Nothing
-            checkPerm (Group group) = hasPerm group
-        unless (hasPerm perm) (fail "NOPERM")
+        let hasPerm "+" = hasRank 1
+            hasPerm "%" = hasRank 2
+            hasPerm "@" = hasRank 3
+            hasPerm perm =
+                anyPerm $ concat $ maybeToList $ M.lookup perm (perms cfg)
+            anyPerm (perm:rest) =
+             do ok <- case perm of
+                      Client re -> return $ (matchRegex re prefix) /= Nothing
+                      Group group -> hasPerm group
+                if ok then return True else anyPerm rest
+            anyPerm [] = return False
+            hasRank expectRank =
+             do rank <- liftIO $ T.lookup (ranks cfg) nick
+                return $ maybe False (>= expectRank) rank
+        ok <- hasPerm perm
+        unless ok (fail "NOPERM")
 
 bot :: (String, String, [String]) -> Bot ()
 bot msg@(prefix, cmd, args') =
@@ -263,11 +310,12 @@ bot msg@(prefix, cmd, args') =
             Send evCmd evArg -> ircSend "" evCmd (map param evArg)
             Say text      -> mapM_ (say replyTo) (lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (lines $ param text)
-            Perm perm     -> requirePerm prefix perm
+            Perm perm     -> requirePerm from prefix perm
             Join channel  -> ircSend "" "JOIN" [param channel]
             Quit msg      -> quitIrc (param msg)
             RandLine fn   -> liftIO (randLine fn) >>= say replyTo . param
-            Rehash        -> killPlugins >> liftIO getConfig >>= ircSetConfig
+            Rehash        -> killPlugins >>
+                ircConfig >>= liftIO . getConfig . ranks >>= ircSetConfig
             Exec prg args -> execSys replyTo prg (map param args)
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
@@ -284,31 +332,36 @@ bot msg@(prefix, cmd, args') =
         from = takeWhile (/= '!') prefix
         args = map utfDecode args'
 
-getConfig = do args <- getArgs
-               s <- readFile (fromMaybe "hircrc" $ listToMaybe args)
-               spoke <- T.new (==) T.hashString
-               return $! prepareConfig spoke $! read (rmComments s)
 
-rmComments = (flip $ subRegex (mkRegex "(^|\n)\\s*#[^\n]*")) ""
+createPatterns :: Config -> ConfigPatterns
+createPatterns cfg = foldr addCmd M.empty
+    (commands cfg ++
+        map (\(pattern, event) -> ("PRIVMSG", ["", pattern], event))
+            (messages cfg))
+  where addCmd (cmd, args, event) = let bind = (map mkRegex args, event) in
+                                    M.alter (Just . maybe [bind] (bind:)) cmd
 
-preparePattern = subst "\\*" ".*" . subst "\\." "\\."
+preparePermPattern = subst "\\*" ".*" . subst "\\." "\\."
     where subst pattern text = (flip $ subRegex (mkRegex pattern)) text
 
-prepareConfig :: T.HashTable String String -> Config -> ConfigSt
-prepareConfig spoke cfg = ConfigSt {
-    raw = cfg,
-    patterns = foldr addCmd M.empty (commands cfg ++
-                 map (\(pattern, event) -> ("PRIVMSG", ["", pattern], event))
-                     (messages cfg)),
-    perms = foldr addPerm M.empty (permits cfg),
-    plugins = M.empty,
-    spoke = spoke
-} where addCmd (cmd, args, event) = let bind = (map mkRegex args, event) in
-                                    M.alter (Just . maybe [bind] (bind:)) cmd
-        addPerm (perm, users) = let perms = map getPerm users in
+getConfig ranks =
+     do args <- getArgs
+        s <- readFile (fromMaybe "hircrc" $ listToMaybe args)
+        spoke <- T.new (==) T.hashString
+        cfg <- return $! read (rmComments s)
+        return $! ConfigSt {
+            raw = cfg,
+            patterns = createPatterns cfg,
+            perms = foldr addPerm M.empty (permits cfg),
+            plugins = M.empty,
+            spoke = spoke,
+            ranks = ranks
+        }
+  where addPerm (perm, users) = let perms = map getPerm users in
                                 M.alter (Just . maybe perms (perms ++)) perm
         getPerm (':':group) = Group group
-        getPerm user = Client (mkRegex ('^':preparePattern user ++ "$"))
+        getPerm user = Client (mkRegex ('^':preparePermPattern user ++ "$"))
+        rmComments = (flip $ subRegex (mkRegex "(^|\n)\\s*#[^\n]*")) ""
 
 reconnect connect =
     appendFile "seen.dat" "\n" >>
@@ -319,6 +372,7 @@ reconnect connect =
                              reconnect connect)
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
-        config <- getConfig
+        ranks <- T.new (==) T.hashString
+        config <- getConfig ranks
         let cfg = raw config
         reconnect $ connectIrc (host cfg) (port cfg) (nick cfg) bot config
