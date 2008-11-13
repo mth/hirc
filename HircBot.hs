@@ -186,7 +186,13 @@ updateSeen what nick _ =
 seenEvent "JOIN" = updateSeen True
 seenEvent "PART" = updateSeen False
 seenEvent "QUIT" = updateSeen False
-seenEvent "NICK" = \old (new:_) -> appendSeen [(old, False), (new, True)]
+seenEvent "NICK" = \old (new:_) ->
+                     do appendSeen [(old, False), (new, True)]
+                        t <- fmap ranks ircConfig
+                        liftIO $ do rank <- T.lookup t old
+                                    T.delete t old
+                                    T.update t new (fromMaybe 0 rank)
+                                    return ()
 seenEvent "KICK" = \_ args -> case args of
                               (_:nick:_) -> updateSeen False nick []
 seenEvent "353" = const $ register . words . last
