@@ -195,6 +195,7 @@ seenEvent "NICK" = \old (new:_) ->
                                     return ()
 seenEvent "KICK" = \_ args -> case args of
                               (_:nick:_) -> updateSeen False nick []
+                              _ -> return ()
 seenEvent "353" = const $ register . words . last
   where stripTag s@(c:t) =
            (if c == ' ' || c == '+' || c == '@' || c == '%' then t else s, True)
