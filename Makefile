@@ -2,7 +2,7 @@
 # aptitude install ghc6 libghc6-mtl-dev libghc6-network-dev libghc6-http-dev libghc6-regex-compat-dev
 
 hirc: Hirc.hs HircBot.hs
-	ghc -o $@ -O2 --make $+
+	ghc -o $@ -W -O2 --make $+
 
 all: hirc acrogrep history
 
