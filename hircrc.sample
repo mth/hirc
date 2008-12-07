@@ -16,6 +16,7 @@ Config {
 		 [Exec "/usr/bin/perl" ["decide.pl", "$1"]]),
 		("^ilm!$", [Plugin ["/usr/bin/perl", "ilm.pl"] ""]),
 		("^!vera +(\\w+)", [Exec "./acrogrep" ["vera.txt", "$1"]]),
+		("^!rfc +(\\w+)", [Exec "/usr/bin/perl" ["find-rfc.pl", "$1"]]),
 		("^!help *$",
  [Say "? ?? !? !add !bite !brainwash !forget !help !history !i-am-idiot !ilm !new !seen !vera"]),
  		("^!help +i-am-idiot *$", [Say "No cure for that"]),
