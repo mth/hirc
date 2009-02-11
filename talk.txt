@@ -1,6 +1,14 @@
 $1: Jah
 $1: Ei
 $1: Võib-olla
+$1: Vist küll...
 Mine magama, $1
 $1: Kindlasti
 $1: Ei huvita.
+$1: Ei usu.
+$1: Soovid sellest veel rääkida?
+$1: Kas see erutaks sind?
+Mõtle veel, $1...
+$1: Selle peale võib mürki võtta.
+$1: Ah, mis sa sokid...
+$1: Maga välja ennast
