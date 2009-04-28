@@ -98,7 +98,7 @@ while (<STDIN>) {
 				($key, $val) = @{$def};
 				$cycle{$key} = 1;
 			}
-			print "$key = $val\n";
+			print "$key - $val\n";
 		} else {
 			print "$_ ei eksisteeri\n"
 		}
@@ -117,7 +117,8 @@ while (<STDIN>) {
 			print "Mis $_?\n"
 		}
 	} elsif ($modify{$cmd}) {
-		if (/^((?:[\w+ -]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/) {
+		if (/^((?:[\w+ -]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
+			/^((?:[\w+ -]|[^\x00-\x80])+?)\s+(\S.*)$/) {
 			my $val;
 			if (my $def = $dict{lc $1}) {
 				(my $name, $val) = @{$def};
