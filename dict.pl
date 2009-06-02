@@ -90,6 +90,8 @@ while (<STDIN>) {
 	my $cmd = $2;
 	s/\s+$//s;
 	if ($cmd eq '?' || $cmd eq '??') {
+		my $at;
+		$at = $1 if s/ +\[(\d+)\]//s;
 		if (my $def = $dict{lc $_}) {
 			my %cycle;
 			my ($key, $val) = @{$def};
@@ -97,6 +99,10 @@ while (<STDIN>) {
 			       $val =~ /^\?\??\s+(.*?)\s*$/ and ($def = $dict{lc $1})) {
 				($key, $val) = @{$def};
 				$cycle{$key} = 1;
+			}
+			if ($at) {
+				my @parts = split(/\s+\|\s+/, $val);
+				$val = $parts[$at - 1];
 			}
 			print "$key - $val\n";
 		} else {
@@ -117,8 +123,8 @@ while (<STDIN>) {
 			print "Mis $_?\n"
 		}
 	} elsif ($modify{$cmd}) {
-		if (/^((?:[\w+ -]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
-			/^((?:[\w+ -]|[^\x00-\x80])+?)\s+(\S.*)$/) {
+		if (/^((?:[\w+ .-]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
+		    /^((?:[\w+ .-]|[^\x00-\x80])+?)\s+(\S.*)$/) {
 			my $val;
 			if (my $def = $dict{lc $1}) {
 				(my $name, $val) = @{$def};
@@ -130,8 +136,9 @@ while (<STDIN>) {
 	} elsif ($cmd eq '!bite') {
 		if (my $def = $dict{lc $_}) {
 			my ($key, $val) = @{$def};
-			if ($val =~ s/\s+\|[^|]*$//s) {
-				def_key("$_ hammustatud.", $key, $val, $loser);
+			if ($val =~ s/\s+\|\s+([^|]*)$//s) {
+				def_key("$_ küljest hammustatud `$1'.",
+					 $key, $val, $loser);
 			} else {
 				print "$_ küljest pole midagi hammustada\n"
 			}
