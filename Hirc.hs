@@ -34,7 +34,7 @@ import System.IO.Error (ioeGetErrorString, ioeGetErrorType, isUserErrorType)
 import System.Environment
 import Prelude hiding (catch)
 
-data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: IORef Bool,
+data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [String],
                          config :: IORef c,
                          currentNick :: IORef String,
@@ -91,18 +91,22 @@ quitIrc quitMsg =
         ircCmd "QUIT" quitMsg
         fail "QUIT"
 
-pinger ctx th = run
+pinger ctx = run
   where run = do threadDelay (1000 * 1000 * 120)
-                 hadPong <- readIORef (lastPong ctx)
-                 writeIORef (lastPong ctx) False
-                 if hadPong then runReaderT (ircCmd "PING" "alive") ctx >> run
-                            else throwTo th (ErrorCall "ping timeout")
+                 runReaderT (ircCmd "PING" "alive") ctx
+                 run
+
+pingChecker ctx th = run
+  where run = do threadDelay 10000000
+                 n <- modifyMVar (lastPong ctx) update
+                 if n >= 300 then throwTo th (ErrorCall "ping timeout") else run
+        update x = let y = x + 10 in return (y, y)
 
 processIrc handler = run wait
   where run p = ask >>= liftIO . hGetLine . conn >>= readMsg >>= p
-        process _ m@(_, "PING", param) = ircSend "" "PONG" param
+        process _ (_, "PING", param) = ircSend "" "PONG" param
         process _ (_, "PONG", _) =
-            ask >>= liftIO . (`writeIORef` True) . lastPong
+            ask >>= liftIO . (`swapMVar` 0) . lastPong >> return ()
         process h msg@(_, cmd, nick:_) | cmd == "NICK" || cmd == "001" =
             ask >>= liftIO . (`writeIORef` nick) . currentNick >> h msg
         process h msg  = h msg
@@ -115,7 +119,7 @@ connectIrc :: Integral a => String -> a -> String
                          -> c -> IO ()
 connectIrc host port nick handler cfg =
      do h <- connectTo host (PortNumber $ fromIntegral port)
-        lastPong <- newIORef True
+        lastPong <- newMVar 0
         sync <- newMVar ()
         buf <- newChan
         cfgRef <- newIORef cfg
@@ -130,10 +134,12 @@ connectIrc host port nick handler cfg =
             ex (IOException e) | ioeGetErrorString e == "QUIT" = return ()
             ex e = do q <- readIORef quit
                       if q then return () else throw e
-        pingerTh <- myThreadId >>= forkIO . pinger ctx
+        pingerTh <- forkIO $ pinger ctx
+        pingCheckerTh <- myThreadId >>= forkIO . pingChecker ctx
         writerTh <- forkIO (writer 1)
         finally (catch (runReaderT run ctx) ex)
-                (killThread pingerTh >> killThread writerTh >> hClose h)
+                (do mapM_ killThread [pingerTh, pingCheckerTh, writerTh]
+                    hClose h)
   where run = do user <- liftIO $ getEnv "USER"
                  ircCmd "NICK" nick
                  ircSend "" "USER" [user, "localhost", "unknown", nick]
