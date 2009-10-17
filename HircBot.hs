@@ -227,8 +227,10 @@ seenEvent "MODE" = const atMode
         mode _ _ _ = return []
         setRank who rank =
              do ranks <- fmap ranks ircConfig
-                putLog ("setRank " ++ who ++ " = " ++ show rank)
-                liftIO $ T.update ranks who rank
+                old <- fmap (fromMaybe 0) $ liftIO $ T.lookup ranks who
+                let rank' = if rank == 0 || old < rank then rank else old
+                putLog ("setRank " ++ who ++ " = " ++ show rank')
+                liftIO $ T.update ranks who rank'
 seenEvent _ = \_ _ -> return ()
 
 {-
