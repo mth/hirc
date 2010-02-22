@@ -13,3 +13,6 @@ $1: Selle peale võib mürki võtta.
 $1: Ah, mis sa sokid...
 $1: Maga välja ennast
 $1: Vahi perset
+$1: Mul on pikem, kui sul.
+$1: Sa oled nii armas ;)
+$1: Embame üksteist?

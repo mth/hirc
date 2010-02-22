@@ -18,7 +18,6 @@ $1: kas see on su nina, või kasvatad endale kolmandat kätt?
 $1: mina olen blond, aga mis sinu vabandus on?
 $1: kuidas Sulle kõrvaltvaatajana inimsugu tundub?
 $1: sina ja inetu? Sa ei ole inetu, sa oled lihtsalt ... äh kuradile, Sa oled inetu. Sitaks inetu. Ja paks ka. Ja kiilakas.
-$1: huvitav, miks tulnukad sulle pärakusse sondi jätsid?
 $1: mitu korda ma pean vett tõmbama, et sa ära kaoksid?
 $1: oled sa alati nii loll või on sul lihtsalt blond hetk??
 K: Mida ütles jumal, kui ta $1' tegi? V: Oh shit!
@@ -83,12 +82,11 @@ Vaata $1't. Ilmne tõestus, et hullari aed on liiga madal.
 Mõistuse pooles on $1'le kõige lähemal reha ... või äärmisel juhul labidas
 $1, kas sa nüüd taipad, mis juhtub, kui sugulased omavahel abielluvad?
 $1, ma suudan vaevu oma ükskõiksust vaos hoida
-$1, sa tuled tuttav ete. Lahkasin sind vist zooloogiatunnis?
+$1, sa tuled tuttav ette. Lahkasin sind vist zooloogiatunnis?
 Kui mind huvitaks su arvamus, $1, siis ütleksin, milline see on.
 Sinuga dringile, $1? Pigem teen endale ise tuimestuseta pimesooleoperatsiooni.
 $1, kas sulle tundub, et ma vajan seltskonda?
 Hei, sina, $1! Kao mu planeedilt minema!
-Huvitav, miks $1 tulnukad sulle pärakusse sondi jätsid?
 $1, ja sinu tattnina-arvamus on...?
 $1, ma ei ole tige. Olen lihtsalt juba {1|2|3|4}0 aastat väga halvas tujus.
 $1, mis stiilis sa ka riietuda ei üritanud, välja see sul igastahes ei tulnud.
@@ -142,7 +140,6 @@ asepresidendiga} pardijahile.
 kas su vanemad tõesti vihkasid sind niipalju et $1 sulle nimeks panid või astusid enesevihkajate klubisse ja võtsid omale sellise nime ?:)
 nimesid nimetamata aga $1 on ikka paras ajukääbik küll
 Sa meeldid mulle $1. Inimesed küll ütlevad, et mul ei ole maitset, aga sa meeldid mulle.
-teeme ka miskit või mitte midagi?
 $1: Ära hakka minuga plõksima. Nagunii sa jagu ei saa.
 $1: ära täna mind su solvamise eest. Seda oli nauding teha.
 $1: ära tunne ennast halvasti. Paljudel inimeste ei ole talenti.
@@ -199,7 +196,6 @@ $1: oled sa alati nii loll või pingutad täna eriti selle nimel?
 $1: oled sa TONT või Inimene ?
 $1: on need sinu silmamunad, mis ma oma dekolteest leidsin?
 $1: on see su nina või sööd sa banaani?
-$1: Palun räägi edasi. Ma tahan magada.
 $1: Parem ära mind vihasta. Mul hakkavad kirstud otsa saama
 $1: sa ei ole paranoik. Kõik vihkavad sind tõesti.
 $1: sa ei saa iialgi nii vanaks kui välja näed.
@@ -217,10 +213,92 @@ $1: sinu nõuannet ma küll ei vaja. Sa ei oska ju kahekümne ühenigi lugeda, kui s
 $1, Sul on nii ilusad kõverad jalad
 $1: Tal on nii inetu nägu, et see trükiti lennukite oksekottidele
 $1: tavaliselt inimesed elavad ja õpivad. Sina ainult elad.
-$1: tunne end nagu kodus. Korista mu köök ära.
+$1: tunne end nagu kodus. Korista mu köök ja WC ära.
 $1: üldiselt ma ei taha küll kellegi kohta sitasti öelda aga sina oled ikka tõsiselt räige
 $1: võin ma sinult su nägu laenata, mu tagumik on puhkusel.
 $1: pane müts pähe.. rähn lendab
 Kuule $1, oled sa mingi Transport Object Assembler?
 Võiks arvata, et $1 on {mingi|mõni} Konfiguratsioon.
 $1 on topis nagu mingi java.
+$1: sinuga läheks luurele küll, aga tagasi tuleksin üksi
+Ettevaatust: $1 võib pikaajalisel tarvitamisel pöördumatult kahjustada teie tervist
+Mis on selle vaimuhaiguse nimi, mille põdeja tõi $1 ilmale?
+Põrgusse see $1, pigem närin endal pea otsast
+$1 puhul on igasuguste teotuste väljamõtlemine mõttetu
+$1, häda on tulnud maale koos sinuga!
+$1: Kas sulle tundub, et ma vajan seltskonda?
+Võrreldes $1 õudusega on Cthulhu nagu pehme kiisupoeg
+Mis kuradi käkk see $1 sihuke on?
+$1 meeldib mulle. Inimesed ütlevad, et mul puudub igasugune maitse, aga mulle ta meeldib.
+rattaletõmbamise võiks asendada $1 kasutamisega
+mullast on $1 tulnud ja mullaks peab ta ka saama
+$1: tahaks sulle vastu hambaid anda aga miks peaksin ma su välimust parandama?
+$1 peal lasub vaaraode needus
+peaga vastu seina peksmine on meeldivam kui $1
+$1 kui ohtlik psühholoogiline relv tuleks Genfi konventsiooniga keelustada
+$1: oled sa alati nii loll või on sul lihtsalt blond hetk?
+$1 on nagu heroiin: korra proovid, igaveseks jama kaelas
+$1: siin on sulle Statoili kinkepakk, tarvita julgelt
+$1: kas sa oled alati nii loll või on täna mingi eriolukord?
+ma ei tea, mis $1 nii lolliks teeb, aga igatahes see mõjub
+$1: mitu korda ma pean vett tõmbama, et sa ära kaoksid?
+$1, ükskord viid sa mu hauda!
+$1: ja mis on sinu olemasolu õigustus?
+$1 on vajalik nagu ürask männile
+$1: sinu pilt on preservatiivipakkidel hoiatava näitena
+$1 vanematest oli väga vastutustundetu keppida
+$1 näeb pimedas palju parem välja
+$1: sina pede mine tagasi munni imema
+$1 võiks oma vinnid ära pigistada enne mölisemist
+$1, kas sul tuld on? Siis pane end põlema.
+isegi $1 psühhiaater keeldub teda kuulamast
+$1: ma ei mäleta su nime, luba ma kutsun sind perseussiks?
+miks $1 mütsi perse peal kannab?
+$1 on nii kole, et isegi kärbestel läheb süda pahaks
+$1 on jälle eksinud nagu sõrm seedekulglasse
+$1 ei saa kunagi nii kõvaks meheks kui ta ema on
+ma ei ole küll proktoloog, aga $1 ajud on pärasoolega vahetusse läinud
+$1: kondoom peas on tõepoolest sulle sobiv riietus!
+$1 on vormis - ümmargune on ka vorm.
+$1: ema ütles sulle, et oled eriline, aga tegelikult oled sa lihtsalt loll
+$1 on universumi loomulik hälve
+$1 püstitas negatiivse IQ maailmarekordi
+$1 on värske nagu munn saunas
+$1 ei ole mitte homo vaid harilik pede
+kui mul oleks Tourette sündroom, siis $1 põhjustaks hoogusid
+$1: näed seda kasti? Värsti näed ainult natuke vasaku silmaga seda. Seestpoolt.
+$1 on nagu emo, kes on zileti kaotanud
+$1 aju on evolutsiooni jäänuk
+$1: mine kümme meetrit eemale, sa solgid mu aura ära.
+paistab, et $1 vanemad ei osanud lapsi teha
+K: Mis on vahet $1'l ja ämbritäiel sital? V: Ämber.
+$1: õpi oma vanemate vigadest - kasuta kondoomi.
+ma oleks $1 isa, kui sada krooni poleks liiga palju olnud ta ema eest
+$1: mine varju - prügiauto tuleb
+loodus oli $1 suhtes helde ainult 21. kromosoomi andes
+$1: ütle oma boyfriendile, et ta sulle rohkem suhu ei situks
+kas kevad on juba, et $1 on lume alt välja sulanud?
+kas keegi peeretas või ütles $1 midagi?
+enamus inimesi moodustab sõnadest lauseid - kuid $1 on eriline
+$1: Sa käia oskad? Siis käi perse!
+$1 vanemad kohtusid esimest korda suguvõsa kokkutulekul
+see, et $1 jalge vahel midagi ripub ei tee temast veel meest
+$1: Kas sa põgenesid geneetikalaborist eile?
+$1: Sul on jälle päevad?
+$1: Palun mine katseklaasi tagasi!
+see, et $1 ahvi moodi haiseb, ei tähenda veel, et ta oleks Tarzan
+Vau! See pidi küll pirakas teerull olema, mis $1 näost üle sõitis.
+$1: säästa oma kopsumahtu tüdruku täis puhumiseks
+ma ei suuda nii palju juua, et $1 inimest meenutama hakkaks
+$1 on elav tõestus, et inimene saab elada ilma ajudeta.
+ajud pole veel kõik - $1 korral pole nad mitte midagi
+igasugune sarnasus $1 ja inimese vahel on täielik kokkusattumus
+kui Frankenstein tahaks idiooti kokku panna, siis vajaks ta $1 tükke
+kes jättis $1 puuri lahti?
+$1: ära tunne end halvasti - paljud inimesed on andetud
+$1: ära mõtle, sa võid oma ajud ära nikastada
+$1: palun räägi edasi, ehk ühel päeval ütled sa ka midagi tarka
+Kui ma sööksin sada kilo nisukliisid, siis mu sitt oleks parem inimene kui $1
+$1 on kahjuks langenud anentsefaalia ohvriks.
+$1: Su ema kepib telliste eest, et su õele litsimaja ehitada...
+$1 on kole nagu hommikune Halonen
