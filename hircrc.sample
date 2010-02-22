@@ -12,7 +12,7 @@ Config {
 		("^((!brainwash|!bite|!forget) .*)",
 		 [Perm "dict", Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
 		("^!say\\s+((!learn|!add) .*)",
-		 [Perm "mdict", Append "say.log" "<$:> $1\n", SayTo "#linux.ee" "$1",
+		 [Perm "mdict", Append "say.log" "<$:> $1\n", SayTo "#hirctest" "$1",
 		  Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
 		("^!insult\\s+(\\S(.*\\S)?)\\s*$", [Perm "dict", RandLine "insult.txt"]),
 		("^!insult\\s*$", [RandLine "insult.txt"]),
@@ -29,10 +29,10 @@ Config {
 		 [Exec "./acrogrep" ["countries.txt", "$1"]]),
 		("^!say\\s+((m8ga\\W*|T3EE\\W*)*(.*))$",
 		  [Perm "mdict", Append "say.log" "<$:> $1\n",
-		   SayTo "#linux.ee" "$3"]),
+		   SayTo "#hirctest" "$3"]),
 		("^!emote\\s+(.*)$",
 		  [Perm "mdict", Append "say.log" "* $:\^I$1\n",
-		   SayTo "#linux.ee" "\^AACTION $1\^A"]),
+		   SayTo "#hirctest" "\^AACTION $1\^A"]),
 		("^!ilm$", [Plugin ["/usr/bin/perl", "ilm.pl"] ""]),
 		("^!vera +(\\w+)", [Exec "./acrogrep" ["vera.txt", "$1"]]),
 		("^!rfc +(\\w+)", [Exec "/usr/bin/perl" ["find-rfc.pl", "$1"]]),
@@ -51,7 +51,7 @@ Config {
 			[Send "NOTICE" ["$0", "\^AVERSION HircB0t v0.0v\^A"]])
 	],
 	commands = [
-		("CONNECTED", [], [Join "#linux.ee"]),
+		("CONNECTED", [], [Join "#hirctest"]),
 		("INVITE", ["", "^#hirctest$"], [Join "#hirctest"]),
 		("366", ["", "(.*)"], [SayTo "$1"  "Kurat, ma olen jälle siin..."])
 	],
