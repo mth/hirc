@@ -56,8 +56,19 @@ utf8Encode (a:b:c:t) | a & 0xf0 == 0xe0 && b & 0xc0 == 0x80 &&
 utf8Encode (a:b:c:d:t) | a & 0xf8 == 0xf0 && b & 0xc0 == 0x80 &&
                         c & 0xc0 == 0x80 && d & 0xc0 == 0x80
     = a : b : c : d : utf8Encode t
--- Invalid byte, treat as latin-1 and encode into 2-byte utf-8
+-- Invalid byte, treat as latin-15 and encode into 2-byte utf-8
 utf8Encode (a:t) =
-    chr (0xc0 .|. shiftR v 6) : chr (0x80 .|. v .&. 0x3f) : utf8Encode t
+    case lookup v latin9Exceptions of
+    Nothing ->
+        chr (0xc0 .|. shiftR v 6) : chr (0x80 .|. v .&. 0x3f) : utf8Encode t
+    Just s -> s ++ utf8Encode t
   where v = ord a
 
+latin9Exceptions = [(0xa4, "\xe2\x82"), -- euro
+                    (0xa6, "\xc5\xa0"), -- Sh
+                    (0xa8, "\xc5\xa1"), -- sh
+                    (0xb4, "\xc5\xbd"), -- Zh
+                    (0xb8, "\xc5\xbe"), -- zh
+                    (0xbc, "\xc5\x92"), -- AE
+                    (0xbd, "\xc5\x93"), -- ae
+                    (0xbe, "\xc5\xb8")] -- Y"
