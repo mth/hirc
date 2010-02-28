@@ -4,6 +4,10 @@
 hirc: Hirc.hs HircBot.hs
 	ghc -o $@ -W -O2 --make $+
 
+# This can be used to convert old databases into utf-8
+utf8-recode: Utf8Recode.hs
+	ghc -o $@ -W -O2 --make $+
+
 all: hirc acrogrep history
 
 acrogrep: acrogrep.c
