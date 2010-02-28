@@ -40,7 +40,7 @@ Config {
  [Say "? ?? !? !add !bite !brainwash !compliment !country !decide !emote !forget !help !history !i-am-idiot !ilm !insult !new !ping !plan !rfc !say !seen !tnick !time !vera"]),
  		("^!help +i-am-idiot *$", [Say "No cure for that"]),
  		("^!help +!i-am-idiot *$", [Say "Yes, you are."]),
- 		("^!help +bite *$", [Say "Hammustab definitsioonil | saba ‰ra"]),
+ 		("^!help +bite *$", [Say "Hammustab definitsioonil | saba √§ra"]),
 		("^!help \\W", [Say "No help, go find a rope"]),
 		("^!ping( |$)", [Say "PONG!!!"]),
 		("^!isitfriday( |$)", [Exec "/usr/bin/perl" ["isitfriday.pl"]]),
@@ -53,7 +53,7 @@ Config {
 	commands = [
 		("CONNECTED", [], [Join "#hirctest"]),
 		("INVITE", ["", "^#hirctest$"], [Join "#hirctest"]),
-		("366", ["", "(.*)"], [SayTo "$1"  "Kurat, ma olen j‰lle siin..."])
+		("366", ["", "(.*)"], [SayTo "$1"  "Kurat, ma olen j√§lle siin..."])
 	],
 	permits = [
 		("root", ["*!~qwr@atsgw.cyber.ee"]),
