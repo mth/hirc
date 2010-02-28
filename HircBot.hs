@@ -18,7 +18,7 @@
  - along with HircBot.  If not, see <http://www.gnu.org/licenses/>.
  -}
 import Hirc
-import Data.Bits
+import Utf8Conv
 import Data.Char
 import Data.Maybe
 import Data.List
@@ -111,45 +111,6 @@ dropPath p = if s == "" then p else dropPath (tail s)
 
 putLog = liftIO . putStrLn
 lower = map toLower
-
-infixl 7 &
-(&) :: Char -> Int -> Int
-c & i = ord c .&. i
-
-utf8Decode :: String -> String
-utf8Decode s@(a:t'@(b:t)) =
-    if ac .&. 0xfc == 0xc0 && bc .&. 0xc0 == 0x80 then
-        chr (shiftL (ac .&. 3) 6 .|. (bc .&. 0x3f)):utf8Decode t
-    else if ac .&. 0x80 == 0 then a:utf8Decode t' else s
-  where ac = ord a
-        bc = ord b
-utf8Decode s = s
-
-{-
- - Encodes non-utf-8 bytes as utf-8.
- - Utf-8 sequences are left untouched.
- -}
-utf8Encode :: String -> String
-
-utf8Encode "" = ""
--- 7bit ASCII - don't modify
-utf8Encode (a:t) | a & 0x80 == 0
-    = a : utf8Encode t
--- 2-byte utf-8 sequence
-utf8Encode (a:b:t) | a & 0xe0 == 0xc0 && b & 0xc0 == 0x80
-    = a : b : utf8Encode t
--- 3-byte utf-8 sequence
-utf8Encode (a:b:c:t) | a & 0xf0 == 0xe0 && b & 0xc0 == 0x80 &&
-                       c & 0xc0 == 0x80
-    = a : b : c : utf8Encode t
--- 4-byte utf-8 sequence
-utf8Encode (a:b:c:d:t) | a & 0xf8 == 0xf0 && b & 0xc0 == 0x80 &&
-                        c & 0xc0 == 0x80 && d & 0xc0 == 0x80
-    = a : b : c : d : utf8Encode t
--- Invalid byte, treat as latin-1 and encode into 2-byte utf-8
-utf8Encode (a:t) =
-    chr (0xc0 .|. shiftR v 6) : chr (0x80 .|. v .&. 0x3f) : utf8Encode t
-  where v = ord a
 
 {-
  - HTTP
