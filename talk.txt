@@ -1,18 +1,18 @@
 $1: Jah
 $1: Ei
-$1: Võib-olla
-$1: Vist küll...
+$1: VÃµib-olla
+$1: Vist kÃ¼ll...
 Mine magama, $1
 $1: Kindlasti
 $1: Ei huvita.
 $1: Ei usu.
-$1: Soovid sellest veel rääkida?
+$1: Soovid sellest veel rÃ¤Ã¤kida?
 $1: Kas see erutaks sind?
-Mõtle veel, $1...
-$1: Selle peale võib mürki võtta.
+MÃµtle veel, $1...
+$1: Selle peale vÃµib mÃ¼rki vÃµtta.
 $1: Ah, mis sa sokid...
-$1: Maga välja ennast
+$1: Maga vÃ¤lja ennast
 $1: Vahi perset
 $1: Mul on pikem, kui sul.
 $1: Sa oled nii armas ;)
-$1: Embame üksteist?
+$1: Embame Ã¼ksteist?

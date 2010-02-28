@@ -21,8 +21,8 @@ sub update {
 	($s,$m,$h) = localtime($last_update = time);
 	$m = sprintf "%02d", $m;
 	$ilm = "kell $h:$m";
-	for (qw(Tallinn Tartu Viljandi Keila Pärnu Võru)) {
-		$ilm = "$ilm; $_: $temp{$_}°C" if $temp{$_}
+	for (qw(Tallinn Tartu Viljandi Keila PÃ¤rnu VÃµru)) {
+		$ilm = "$ilm; $_: $temp{$_}Â°C" if $temp{$_}
 	}
 	$ilm =~ s/([0-9])\.([0-9])/\1,\2/sg;
 	$ilm =~ s/\n//sg;

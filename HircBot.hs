@@ -36,6 +36,9 @@ import System.IO
 import qualified Network.HTTP as H
 import Network.URI
 
+data EncodingSpec = Utf8 | Latin1 | Raw
+    deriving Read
+
 data EventSpec =
     Send String [String] | Say String | SayTo String String |
     Join String | Quit String | Perm String | RandLine String |
@@ -50,6 +53,7 @@ data Config = Config {
     host :: String,
     port :: Integer,
     nick :: String,
+    encoding :: EncodingSpec,
     messages :: [(String, [EventSpec])],
     commands :: [(String, [String], [EventSpec])],
     permits  :: [(String, [String])],
@@ -66,6 +70,7 @@ type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
 data ConfigSt = ConfigSt {
     raw :: Config,
+    encodeInput :: String -> String,
     patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
     spoke :: T.HashTable String String,
@@ -107,13 +112,44 @@ dropPath p = if s == "" then p else dropPath (tail s)
 putLog = liftIO . putStrLn
 lower = map toLower
 
-utfDecode s@(a:t'@(b:t)) =
+infixl 7 &
+(&) :: Char -> Int -> Int
+c & i = ord c .&. i
+
+utf8Decode :: String -> String
+utf8Decode s@(a:t'@(b:t)) =
     if ac .&. 0xfc == 0xc0 && bc .&. 0xc0 == 0x80 then
-        chr (shiftL (ac .&. 3) 6 .|. (bc .&. 0x3f)):utfDecode t
-    else if ac .&. 0x80 == 0 then a:utfDecode t' else s
+        chr (shiftL (ac .&. 3) 6 .|. (bc .&. 0x3f)):utf8Decode t
+    else if ac .&. 0x80 == 0 then a:utf8Decode t' else s
   where ac = ord a
         bc = ord b
-utfDecode s = s
+utf8Decode s = s
+
+{-
+ - Encodes non-utf-8 bytes as utf-8.
+ - Utf-8 sequences are left untouched.
+ -}
+utf8Encode :: String -> String
+
+utf8Encode "" = ""
+-- 7bit ASCII - don't modify
+utf8Encode (a:t) | a & 0x80 == 0
+    = a : utf8Encode t
+-- 2-byte utf-8 sequence
+utf8Encode (a:b:t) | a & 0xe0 == 0xc0 && b & 0xc0 == 0x80
+    = a : b : utf8Encode t
+-- 3-byte utf-8 sequence
+utf8Encode (a:b:c:t) | a & 0xf0 == 0xe0 && b & 0xc0 == 0x80 &&
+                       c & 0xc0 == 0x80
+    = a : b : c : utf8Encode t
+-- 4-byte utf-8 sequence
+utf8Encode (a:b:c:d:t) | a & 0xf8 == 0xf0 && b & 0xc0 == 0x80 &&
+                        c & 0xc0 == 0x80 && d & 0xc0 == 0x80
+    = a : b : c : d : utf8Encode t
+-- Invalid byte, treat as latin-1 and encode into 2-byte utf-8
+utf8Encode (a:t) =
+    chr (0xc0 .|. shiftR v 6) : chr (0x80 .|. v .&. 0x3f) : utf8Encode t
+  where v = ord a
 
 {-
  - HTTP
@@ -298,8 +334,14 @@ requirePerm nick prefix perm =
         ok <- hasPerm perm
         unless ok (fail "NOPERM")
 
+-- wrapper that encodes irc input into desired charset
 bot :: (String, String, [String]) -> Bot ()
-bot msg@(prefix, cmd, args') =
+bot (prefix, cmd, args) =
+     do cfg <- ircConfig
+        bot' (prefix, cmd, map (encodeInput cfg) args)
+
+bot' :: (String, String, [String]) -> Bot ()
+bot' msg@(prefix, cmd, args) =
     ircCatch (seenEvent cmd from args)
              (putLog . (("seenEvent " ++ cmd ++ ": ") ++) . show) >>
     ircCatch (ircConfig >>= maybe (liftIO $ print msg) doMatch
@@ -339,8 +381,6 @@ bot msg@(prefix, cmd, args') =
                   (s@('#':_)):_ -> s
                   _ -> from
         from = takeWhile (/= '!') prefix
-        args = map utfDecode args'
-
 
 createPatterns :: Config -> ConfigPatterns
 createPatterns cfg = foldr addCmd M.empty
@@ -360,6 +400,10 @@ getConfig ranks =
         cfg <- return $! read (rmComments s)
         return $! ConfigSt {
             raw = cfg,
+            encodeInput = case encoding cfg of
+                          Utf8 -> utf8Encode
+                          Latin1 -> utf8Decode
+                          Raw -> id,
             patterns = createPatterns cfg,
             perms = foldr addPerm M.empty (permits cfg),
             plugins = M.empty,

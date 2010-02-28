@@ -64,14 +64,14 @@ my %modify = (
 		if ($_[3]) {
 			print "$_[0] on juba tuntud\n"
 		} else {
-			def_key("Jätsin meelde: $_[0]", @_)
+			def_key("JÃ¤tsin meelde: $_[0]", @_)
 		}
 	},
 	'!brainwash' => sub {
 		if ($_[3]) {
 			def_key("Uuendasin $_[0]", @_)
 		} else {
-			print "Ma ei mäleta enam, mis $_[0] on.\n"
+			print "Ma ei mÃ¤leta enam, mis $_[0] on.\n"
 		}
 	},
 	'!add' => sub {
@@ -79,7 +79,7 @@ my %modify = (
 		if ($old) {
 			def_key("Uuendasin $_[0]", $key, "$old | $val", $loser);
 		} else {
-			print "Ma ei mäleta enam, mis $_[0] on.\n"
+			print "Ma ei mÃ¤leta enam, mis $_[0] on.\n"
 		}
 	}
 );
@@ -131,23 +131,23 @@ while (<STDIN>) {
 			}
 			$modify{$cmd}->($1, $2, $loser, $val);
 		} else {
-			print "Su väljendusoskus jätab soovida.\n";
+			print "Su vÃ¤ljendusoskus jÃ¤tab soovida.\n";
 		}
 	} elsif ($cmd eq '!bite') {
 		if (my $def = $dict{lc $_}) {
 			my ($key, $val) = @{$def};
 			if ($val =~ s/\s+\|\s+([^|]*)$//s) {
-				def_key("$_ küljest hammustatud `$1'.",
+				def_key("$_ kÃ¼ljest hammustatud `$1'.",
 					 $key, $val, $loser);
 			} else {
-				print "$_ küljest pole midagi hammustada\n"
+				print "$_ kÃ¼ljest pole midagi hammustada\n"
 			}
 		} else {
 			print "$_ on misasi?\n"
 		}
 	} elsif ($cmd eq '!forget') {
 		if ($dict{lc $_}) {
-			def_key("Unustasin $_ tähenduse", $_, '', $loser)
+			def_key("Unustasin $_ tÃ¤henduse", $_, '', $loser)
 		} else {
 			print "Mida ma pidin unustama?\n"
 		}
