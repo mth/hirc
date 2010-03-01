@@ -24,6 +24,7 @@ import Data.Maybe
 import Data.List
 import qualified Data.Map as M
 import qualified Data.HashTable as T
+import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
 import Text.Regex
@@ -73,7 +74,7 @@ data ConfigSt = ConfigSt {
     encodeInput :: String -> String,
     patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
-    spoke :: T.HashTable String String,
+    spoke :: T.HashTable String C.ByteString,
     ranks :: T.HashTable String Int,
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
@@ -172,7 +173,7 @@ appendSeen nicks =
         let t = show t'
             format (nick, alive) =
              let key = lower nick in
-             do said <- fmap (fromMaybe "") (T.lookup st key)
+             do said <- fmap (maybe "" C.unpack) (T.lookup st key)
                 T.delete st key
                 return (nick ++ '\t':(if alive then '+':t else t) ++ '\t':said)
         liftIO (mapM format nicks >>= appendFile "seen.dat" . unlines)
@@ -314,7 +315,7 @@ bot' msg@(prefix, cmd, args) =
                                         $ concat p) events)
                   (sequence $ zipWith matchRegex argPattern args)
         doMatch [] = do let what = last args
-                        when (cmd == "PRIVMSG") (seenMsg from what)
+                        when (cmd == "PRIVMSG") (seenMsg from $ C.pack what)
                         when (args /= [] && isPrefixOf "!" what)
                              (putLog $ "NOMATCH " ++ showMsg msg)
         execute param event =
