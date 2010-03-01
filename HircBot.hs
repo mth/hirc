@@ -92,9 +92,9 @@ bindArg prefix bindings str =
 
 randLine :: String -> IO String
 randLine fn =
-     do l <- fmap lines (readFile fn)
+     do l <- fmap C.lines (C.readFile fn)
         n <- randomRIO (0, length l - 1)
-        format (l !! n)
+        format $ C.unpack $ l !! n
   where format ('{':t) = snippet t "" []
         format (c:t) = fmap (c:) (format t)
         format "" = return ""
