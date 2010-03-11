@@ -5,6 +5,7 @@ Config {
 	messages = [
 		("^!quit$", [Perm "root", Quit "Returning to hell..."]),
 		("^!reload$", [Perm "root", Rehash, Say "Matrix ok."]),
+		("^= ([^:?]*)$", [Calc "$1"]),
 		("^(\\?\\?? .*|!\\? .*|!new$)",
 		 [Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
 		("^((!learn|!add) .*)",
