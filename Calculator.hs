@@ -81,7 +81,7 @@ lexer a@(t:_) (x:xs) | x /= '-' && kind t == kind x &&
 lexer a s = next lexer a s
 
 skip n a ('(':s) = skip (n + 1) ('(':a) s
-skip 0 a (')':s) = reverse a : lexer "" s
+skip 0 a (')':s) = ('(':reverse a) : lexer "" s
 skip n a (')':s) = skip (n - 1) (')':a) s
 skip n a (x:xs)  = skip n (x:a) xs
 skip _ _ _ = error "(Mismatched"
