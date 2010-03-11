@@ -43,7 +43,7 @@ expr = (binInt [("<<", shiftL), (">>", shiftR)] $
         bin [("+", (+)), ("-", (-))] $
         binInt [("|", (.|.)), ("&", (.&.)), ("xor", xor)] $
         bin [("*", (*)), ("/", (/)), ("%", (%))] $
-        bin [("^", (**))] fun) . unary . lexer ""
+        bin [("^", (**))] fun) . (\x -> tail (unary ("":lexer "" x)))
 
 bin :: [(String, Double -> Double -> Double)]
         -> ([String] -> Double) -> [String] -> Double
