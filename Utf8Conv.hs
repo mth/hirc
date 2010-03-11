@@ -1,6 +1,6 @@
 {-
  - Minimal utf8 <-> latin1 autoconversion functions.
- - Copyright (C) 2008  Madis Janson
+ - Copyright (C) 2010  Madis Janson
  -
  - This file is part of HircBot.
  - 

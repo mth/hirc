@@ -19,6 +19,7 @@
  -}
 import Hirc
 import Utf8Conv
+import Calculator
 import Data.Char
 import Data.Maybe
 import Data.List
@@ -44,7 +45,7 @@ data EventSpec =
     Send String [String] | Say String | SayTo String String |
     Join String | Quit String | Perm String | RandLine String |
     Exec String [String] | Plugin [String] String |
-    Http String String Int String [EventSpec] |
+    Http String String Int String [EventSpec] | Calc String |
     Append String String | Rehash
     deriving Read
 
@@ -321,12 +322,13 @@ bot' msg@(prefix, cmd, args) =
         execute param event =
             case event of
             Send evCmd evArg -> ircSend "" evCmd (map param evArg)
-            Say text      -> mapM_ (say replyTo) (lines $ param text)
+            Say text      -> mapM_ reply (lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (lines $ param text)
             Perm perm     -> requirePerm from prefix perm
             Join channel  -> ircSend "" "JOIN" [param channel]
             Quit msg      -> quitIrc (param msg)
-            RandLine fn   -> liftIO (randLine fn) >>= say replyTo . param
+            RandLine fn   -> liftIO (randLine fn) >>= reply . param
+            Calc text     -> ircCatch (reply $ calc $ param text) reply
             Rehash        -> killPlugins >>
                 ircConfig >>= liftIO . getConfig . ranks >>= ircSetConfig
             Exec prg args -> execSys replyTo prg (map param args)
@@ -342,6 +344,7 @@ bot' msg@(prefix, cmd, args) =
         replyTo = case args of
                   (s@('#':_)):_ -> s
                   _ -> from
+        reply = say replyTo
         from = takeWhile (/= '!') prefix
 
 createPatterns :: Config -> ConfigPatterns
