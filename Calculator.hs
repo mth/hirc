@@ -68,7 +68,8 @@ fun [x] = case reads x of
 fun (x:xs) = maybe (error (show x ++ "?")) ($ (fun xs)) (lookup x functions)
 
 unary [] = []
-unary (a:"-":x:xs) | not (any isDigit a) = a:unary (('-':x):xs)
+unary (a:"-":x:xs) | not (any isDigit a || elem a ["pi", "e"]) =
+        a:unary (('-':x):xs)
 unary (x:xs) = x:unary xs
 
 lexer "" "" = []
@@ -76,7 +77,7 @@ lexer a (' ':s) = next lexer a s
 lexer a ('(':s) = next (skip 0) a s
 lexer _ (')':_) = error "Mismatched)"
 lexer a@(t:_) (x:xs) | x /= '-' && kind t == kind x &&
-                       not (all isAlpha a) || isAlpha x = lexer (x:a) xs
+                       (not (all isAlpha a) || isAlpha x) = lexer (x:a) xs
   where kind c = c == '.' || c == '~' || isAlphaNum c
 lexer a s = next lexer a s
 
