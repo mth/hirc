@@ -22,7 +22,7 @@ if (open F, "<$DICT") {
 			delete $dict{$key}
 		}
 	}
-	close F
+	close F;
 } else {
 	print STDERR "$DICT: $!"
 }
@@ -30,7 +30,7 @@ if (open F, "<$DICT") {
 my @new = ();
 for (my $i = $newPos + $MAX_NEW; --$i >= $newPos;) {
 	my $v = $new_[$i % $MAX_NEW];
-	push @new, $v if $v;
+	push @new, $v if $v and $dict{lc $v};
 }
 @new_ = ();
 
@@ -54,15 +54,47 @@ sub def_key {
 			unshift @new, $name;
 		}
 	} else {
-		delete $dict{lc $name}
+		$name = lc $name;
+		delete $dict{$name};
+		@new = grep {lc $_ eq $name} @new
 	}
 	print $msg, "\n"
+}
+
+sub find {
+	my $s = lc $_[0];
+	my %rr;
+	while ((my ($k, $def) = each %dict)) {
+		my ($name, $val) = @{$def};
+		if (index($k, $s) >= 0 or index(lc $val, $s) >= 0) {
+			next if length($name) <= 1 or index($name, ', ') >= 0;
+			my $c = 0;
+			if ($k eq $s) {
+				$c = 10
+			} elsif ($k =~ /(?:^|\W)\Q$s\E(?:\W|$)/) {
+				$c = 8
+			} elsif ($k =~ /\Q$s\E/sg) {
+				$c = 2
+			}
+			$c += 4 if $val =~ /(?:^|[^\w.?\/&=])\Q$s\E(?:[^\w?\/&=]|$)/is;
+			++$c while $val =~ /\Q$s\E/sig;
+			$rr{$name} = $c;
+		}
+	}
+	my @r = sort {$rr{$b} <=> $rr{$a}} (keys %rr);
+	@r = @r[0..29] if @r > 30;
+	print join(", ", @r), "\n" if @r;
+	@r
 }
 
 my %modify = (
 	'!learn' => sub {
 		if ($_[3]) {
 			print "$_[0] on juba tuntud\n"
+		} elsif ($_[0] =~ /, /) {
+			print "Koma on paha\n"
+		} elsif ($_[0] =~ / \| /) {
+			print "Toru on halb\n"
 		} else {
 			def_key("Jätsin meelde: $_[0]", @_)
 		}
@@ -105,23 +137,11 @@ while (<STDIN>) {
 				$val = $parts[$at - 1];
 			}
 			print "$key - $val\n";
-		} else {
+		} elsif (!$at and !find($_)) {
 			print "$_ ei eksisteeri\n"
 		}
 	} elsif ($cmd eq '!?') {
-		my $s = lc $_;
-		my @r;
-		while ($#r < 30 and (my ($k, $def) = each %dict)) {
-			my ($name, $val) = @{$def};
-			if (index($k, $s) >= 0 or index(lc $val, $s) >= 0) {
-				push @r, $name
-			}
-		}
-		if (@r) {
-			print join(", ", @r), "\n"
-		} else {
-			print "Mis $_?\n"
-		}
+		find($_) or print "Mis $_?\n"
 	} elsif ($modify{$cmd}) {
 		if (/^((?:[\w+ .-]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
 		    /^((?:[\w+ .-]|[^\x00-\x80])+?)\s+(\S.*)$/) {
