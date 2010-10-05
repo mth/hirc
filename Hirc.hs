@@ -130,10 +130,9 @@ connectIrc host port nick handler cfg =
                           runReaderT (ircSend "" "PRIVMSG" msg) ctx
                           writer (sum (120 : map length msg) * 9000)
             ex (ErrorCall e) = fail e
-            ex e = do q <- readIORef quit
-                      if q then return () else throw e
             ioEx e | ioeGetErrorString e == "QUIT" = return ()
-            ioEx e = ioError e
+            ioEx e = do q <- readIORef quit
+                        if q then return () else ioError e
         mainThread <- myThreadId
         threads <- sequence $ map forkIO [
             pinger ctx, pingChecker ctx mainThread, writer 1]
@@ -154,7 +153,6 @@ ircCatch :: Irc c a -> (String -> Irc c a) -> Irc c a
 ircCatch action handler =
      do liftIrc <- escape
         let ex (ErrorCall e) = liftIrc $ handler e
-            ex e = throw e
             ioEx e | isUserErrorType (ioeGetErrorType e) =
                 liftIrc $ handler $ ioeGetErrorString e
             ioEx e = ioError e
