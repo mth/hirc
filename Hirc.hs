@@ -24,7 +24,7 @@ module Hirc (
 
 import Control.Arrow
 import Control.Concurrent
-import Control.Exception
+import Control.Exception as E
 import Control.Monad.Reader
 import Data.IORef
 import Data.List
@@ -32,7 +32,6 @@ import Network
 import System.IO
 import System.IO.Error (ioeGetErrorString, ioeGetErrorType, isUserErrorType)
 import System.Environment
-import Prelude hiding (catch)
 
 data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [String],
@@ -131,14 +130,15 @@ connectIrc host port nick handler cfg =
                           runReaderT (ircSend "" "PRIVMSG" msg) ctx
                           writer (sum (120 : map length msg) * 9000)
             ex (ErrorCall e) = fail e
-            ex (IOException e) | ioeGetErrorString e == "QUIT" = return ()
             ex e = do q <- readIORef quit
                       if q then return () else throw e
-        pingerTh <- forkIO $ pinger ctx
-        pingCheckerTh <- myThreadId >>= forkIO . pingChecker ctx
-        writerTh <- forkIO (writer 1)
-        finally (catch (runReaderT run ctx) ex)
-                (do mapM_ killThread [pingerTh, pingCheckerTh, writerTh]
+            ioEx e | ioeGetErrorString e == "QUIT" = return ()
+            ioEx e = ioError e
+        mainThread <- myThreadId
+        threads <- sequence $ map forkIO [
+            pinger ctx, pingChecker ctx mainThread, writer 1]
+        finally (E.catch (Prelude.catch (runReaderT run ctx) ioEx) ex)
+                (do mapM_ killThread threads
                     hClose h)
   where run = do user <- liftIO $ getEnv "USER"
                  ircCmd "NICK" nick
@@ -154,10 +154,11 @@ ircCatch :: Irc c a -> (String -> Irc c a) -> Irc c a
 ircCatch action handler =
      do liftIrc <- escape
         let ex (ErrorCall e) = liftIrc $ handler e
-            ex (IOException e) | isUserErrorType (ioeGetErrorType e) =
-                liftIrc $ handler $ ioeGetErrorString e
             ex e = throw e
-        liftIO $ catch (liftIrc action) ex
+            ioEx e | isUserErrorType (ioeGetErrorType e) =
+                liftIrc $ handler $ ioeGetErrorString e
+            ioEx e = ioError e
+        liftIO $ E.catch (Prelude.catch (liftIrc action) ioEx) ex
 
 ircConfig :: Irc c c
 ircConfig = ask >>= liftIO . readIORef . config
