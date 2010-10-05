@@ -152,11 +152,11 @@ escape =
 ircCatch :: Irc c a -> (String -> Irc c a) -> Irc c a
 ircCatch action handler =
      do liftIrc <- escape
-        let ex (ErrorCall e) = liftIrc $ handler e
+        let ex (ErrorCall e) = fail e
             ioEx e | isUserErrorType (ioeGetErrorType e) =
-                liftIrc $ handler $ ioeGetErrorString e
+                liftIrc $ handler (ioeGetErrorString e)
             ioEx e = ioError e
-        liftIO $ E.catch (Prelude.catch (liftIrc action) ioEx) ex
+        liftIO $ Prelude.catch (E.catch (liftIrc action) ex) ioEx
 
 ircConfig :: Irc c c
 ircConfig = ask >>= liftIO . readIORef . config
