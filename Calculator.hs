@@ -17,16 +17,28 @@
  - You should have received a copy of the GNU General Public License
  - along with HircBot.  If not, see <http://www.gnu.org/licenses/>.
  -}
+{-# LANGUAGE ForeignFunctionInterface #-}
 module Calculator (calc) where
 
 import Data.Bits
 import Data.Char
 import Data.List
 import Data.Maybe
+import System.IO.Unsafe
+import Foreign.C.String
+
+foreign import ccall "show_double" c_show_double ::
+    CString -> Int -> Double -> IO ()
+
+show_double :: Double -> String
+show_double x =
+    unsafePerformIO $ withCAStringLen (replicate 40 ' ') (\(s, len) ->
+        do c_show_double s len x
+           peekCAString s)
 
 calc :: String -> String
 calc x = if ".0" `isSuffixOf` res then take (length res - 2) res else res
-  where res = show $ expr x
+  where res = show_double $ expr x
 
 functions :: [(String, Double -> Double)]
 functions =
