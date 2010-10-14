@@ -26,7 +26,7 @@ import Numeric
 
 calc :: String -> String
 calc x = if result == 0 then "0" else
-            if abs result >= 10000000 || abs result < 0.001
+            if abs result > 4294967296 || abs result < 0.001
                 then showEFloat (Just 15) result ""
                 else dropTail $ showFFloat (Just prec) result ""
   where result = expr x
