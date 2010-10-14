@@ -25,8 +25,13 @@ import Data.Maybe
 import Numeric
 
 calc :: String -> String
-calc x = reverse $ dropWhile (== '.') $ dropWhile (== '0') $ reverse $
-            showGFloat (Just 15) (expr x) ""
+calc x = if result == 0 then "0" else
+            if abs result >= 10000000 || abs result < 0.001
+                then showEFloat (Just 15) result ""
+                else dropTail $ showFFloat (Just prec) result ""
+  where result = expr x
+        prec = max 0 (14 - truncate (fromIntegral (exponent result) * 0.3))
+        dropTail = reverse . dropWhile (== '.') . dropWhile (== '0') . reverse
 
 functions :: [(String, Double -> Double)]
 functions =
