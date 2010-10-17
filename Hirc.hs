@@ -118,6 +118,7 @@ connectIrc :: Integral a => String -> a -> String
                          -> c -> IO ()
 connectIrc host port nick handler cfg =
      do h <- connectTo host (PortNumber $ fromIntegral port)
+        hSetEncoding h latin1
         lastPong <- newMVar 0
         sync <- newMVar ()
         buf <- newChan

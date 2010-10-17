@@ -141,7 +141,9 @@ execSys :: String -> String -> [String] -> Bot ()
 execSys to prog argv =
      do (inp, out, err, pid) <-
             liftIO $ runInteractiveProcess prog argv Nothing Nothing
-        liftIO $ hClose inp
+        liftIO (do hClose inp
+                   hSetEncoding out latin1
+                   hSetEncoding err latin1)
         sayTo <- fmap (. say to) escape
         let copy h = liftIO $ forkIO $
              do l <- fmap lines (hGetContents h)
@@ -260,7 +262,9 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                 (\e -> putStrLn (show id ++ ": " ++ show e) >>
                        unlift (kill >>
                                 say replyTo "\^AACTION has a ghost plugin\^A"))
-        liftIO $ do hSetBuffering inp LineBuffering
+        liftIO $ do hSetEncoding inp latin1
+                    hSetEncoding out latin1
+                    hSetBuffering inp LineBuffering
                     forkIO $ output
                     forkIO $ hGetContents err >>= putStr
         return handler
@@ -360,7 +364,7 @@ preparePermPattern = subst "\\*" ".*" . subst "\\." "\\."
 
 getConfig ranks =
      do args <- getArgs
-        s <- readFile (fromMaybe "hircrc" $ listToMaybe args)
+        s <- fmap C.unpack $ C.readFile (fromMaybe "hircrc" $ listToMaybe args)
         spoke <- T.new (==) T.hashString
         cfg <- return $! read (rmComments s)
         return $! ConfigSt {
