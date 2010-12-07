@@ -79,6 +79,7 @@ data ConfigSt = ConfigSt {
     encodeInput :: String -> String,
     patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
+    -- Map nick (Map channel User)
     users :: M.Map String (M.Map String User),
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
