@@ -222,9 +222,9 @@ seenEvent "NICK" old (new:_) =
         mapM_ (appendSeen [(old, False), (new, True)]) (M.keys user)
         updateUserMap (const user) new
 
-seenEvent "353" _ (_:channel:args) =
-     do appendSeen (map stripTag names) channel
-        mapM_ checkMode names
+seenEvent "353" _ args =
+     do appendSeen (map stripTag nameList) channel
+        mapM_ checkMode nameList
   where stripTag s@(c:t) = (if c `elem` " +@%" then t else s, True)
         stripTag s = (s, True)
         modeRank '@' = 3
@@ -233,7 +233,8 @@ seenEvent "353" _ (_:channel:args) =
         modeRank _ = 0
         checkMode (c:t) = updateRank (const (modeRank c)) channel t
         checkMode _ = return ()
-        names = words (last args)
+        (names:channel:_) = reverse args
+        nameList = words names
 
 -- track mode changes for maintaining ranks
 seenEvent "MODE" _ (channel:m:args') = modes False m args'
