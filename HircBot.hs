@@ -253,7 +253,8 @@ seenEvent "MODE" _ (channel:m:args') = modes False m args'
              do updateRank (if rank' == 0 then const 0 else max rank')
                            channel who
                 user <- getUser channel who
-                putLog ("setRank " ++ who ++ " = " ++ show (maybe 0 rank user))
+                putLog ("setRank " ++ channel ++ ' ':who ++ " = " ++
+                        show (maybe 0 rank user))
 
 seenEvent _ _ _ = return ()
 
