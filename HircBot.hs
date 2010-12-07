@@ -79,7 +79,7 @@ data ConfigSt = ConfigSt {
     encodeInput :: String -> String,
     patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
-    users :: M.Map String User,
+    users :: M.Map String (M.Map String User),
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
@@ -168,69 +168,75 @@ execSys to prog argv =
 {-
  - SEEN
  -}
-getUser :: String -> Bot (Maybe User)
-getUser nick = ircConfig >>= return . M.lookup (lower nick) . users
+getUserMap :: String -> Bot (M.Map String User)
+getUserMap nick =
+    fmap (M.findWithDefault M.empty (lower nick) . users) ircConfig
 
-updateUser :: (Maybe User -> Maybe User) -> String -> Bot ()
-updateUser f nick =
+getUser :: String -> String -> Bot (Maybe User)
+getUser channel nick = fmap (M.lookup channel) (getUserMap nick)
+
+updateUserMap :: (M.Map String User -> M.Map String User) -> String -> Bot ()
+updateUserMap f nick =
      do cfg <- ircConfig
-        ircSetConfig cfg { users = M.alter f (lower nick) (users cfg) }
+        ircSetConfig cfg { users = M.alter modify (lower nick) (users cfg) }
+ where modify m = let res = f $ fromMaybe M.empty m in
+                  if M.null res then Nothing else Just res
 
-updateRank :: (Int -> Int) -> String -> Bot ()
-updateRank f nick = updateUser update nick
+updateUser :: (Maybe User -> Maybe User) -> String -> String -> Bot ()
+updateUser f channel nick = updateUserMap (M.alter f channel) nick
+
+updateRank :: (Int -> Int) -> String -> String -> Bot ()
+updateRank f channel nick = updateUser update channel nick
   where update u = let r = f (maybe 0 rank u)
                        s = maybe C.empty spoke u in
                    if r == 0 && C.null s then Nothing
                                          else Just (User {rank = r, spoke = s})
 
-seenMsg nick said =
-    updateUser (\u -> Just (User {rank = maybe 0 rank u, spoke = said})) nick
+seenMsg (Just channel) nick said = updateUser update channel nick
+  where update u = Just (User {rank = maybe 0 rank u, spoke = said})
+seenMsg Nothing _ _ = return () -- private message
 
-appendSeen :: [(String, Bool)] -> Bot ()
-appendSeen nicks =
+appendSeen :: [(String, Bool)] -> String -> Bot ()
+appendSeen nicks channel =
      do TOD t _ <- liftIO getClockTime
         mapM (format (show t)) nicks >>=
             liftIO . appendFile "seen.dat" . unlines
   where clear alive u = if alive && rank u /= 0
                             then return $ u {spoke = C.empty} else Nothing
-        format :: String -> (String, Bool) -> Bot String
         format t (nick, alive) =
-         do user <- getUser nick
-            updateUser (>>= clear alive) nick
+         do user <- getUser channel nick
+            updateUser (>>= clear alive) channel nick
             let said = maybe "" (C.unpack . spoke) user
             return (nick ++ '\t':(if alive then '+':t else t) ++ '\t':said)
 
-updateSeen what nick _ =
-     appendSeen [(nick, what)]
-seenEvent "JOIN" = updateSeen True
-seenEvent "PART" = updateSeen False
-seenEvent "QUIT" = updateSeen False
-seenEvent "NICK" = \old (new:_) ->
-                     do user <- getUser old
-                        appendSeen [(old, False), (new, True)]
-                        updateUser (const user) new
-seenEvent "KICK" = \_ args -> case args of
-                              (_:nick:_) -> updateSeen False nick []
-                              _ -> return ()
-seenEvent "353" = const $ register . words . last
-  where stripTag s@(c:t) =
-           (if c == ' ' || c == '+' || c == '@' || c == '%' then t else s, True)
+seenEvent "JOIN" nick (channel:_)   = appendSeen [(nick, True)] channel
+seenEvent "PART" nick (channel:_)   = appendSeen [(nick, False)] channel
+seenEvent "KICK" _ (channel:nick:_) = appendSeen [(nick, False)] channel
+
+seenEvent "QUIT" nick _ =
+    getUserMap nick >>= mapM_ (appendSeen [(nick, False)]) . M.keys
+
+seenEvent "NICK" old (new:_) =
+     do user <- getUserMap old
+        mapM_ (appendSeen [(old, False), (new, True)]) (M.keys user)
+        updateUserMap (const user) new
+
+seenEvent "353" _ (_:channel:args) =
+     do appendSeen (map stripTag names) channel
+        mapM_ checkMode names
+  where stripTag s@(c:t) = (if c `elem` " +@%" then t else s, True)
         stripTag s = (s, True)
         modeRank '@' = 3
         modeRank '%' = 2
         modeRank '+' = 1
         modeRank _ = 0
-        checkMode (c:t) = updateRank (const (modeRank c)) t
+        checkMode (c:t) = updateRank (const (modeRank c)) channel t
         checkMode _ = return ()
-        register names =
-             do appendSeen (map stripTag names)
-                mapM_ checkMode names
+        names = words (last args)
 
 -- track mode changes for maintaining ranks
-seenEvent "MODE" = const atMode
-  where atMode (_:m:args) = modes False m args
-        atMode _ = return ()
-        modes _ ('+':m) args = modes True m args
+seenEvent "MODE" _ (channel:m:args') = modes False m args'
+  where modes _ ('+':m) args = modes True m args
         modes _ ('-':m) args = modes False m args
         modes set (c:m) args = mode set c args >>= modes set m
         modes _ _ _ = return ()
@@ -242,10 +248,12 @@ seenEvent "MODE" = const atMode
             Nothing -> return args'
         mode _ _ _ = return []
         setRank who rank' =
-             do updateRank (if rank' == 0 then const 0 else max rank') who
-                user <- getUser who
+             do updateRank (if rank' == 0 then const 0 else max rank')
+                           channel who
+                user <- getUser channel who
                 putLog ("setRank " ++ who ++ " = " ++ show (maybe 0 rank user))
-seenEvent _ = \_ _ -> return ()
+
+seenEvent _ _ _ = return ()
 
 {-
  - PLUGIN
@@ -294,8 +302,8 @@ invokePlugin id to msg =
 {-
  - CORE
  -}
-requirePerm :: String -> String -> String -> Bot ()
-requirePerm nick prefix perm =
+requirePerm :: Maybe String -> String -> String -> String -> Bot ()
+requirePerm channel nick prefix perm =
      do cfg <- ircConfig
         let hasPerm "+" = hasRank 1
             hasPerm "%" = hasRank 2
@@ -309,7 +317,13 @@ requirePerm nick prefix perm =
                 if ok then return True else anyPerm rest
             anyPerm [] = return False
             hasRank expectRank =
-                getUser nick >>= return . maybe False ((>= expectRank) . rank)
+                -- It's idiotic to give perm based on rank on any channel,
+                -- but I can't think of better solution now for private chat
+                case channel of
+                Nothing -> fmap (any (\u -> rank u >= expectRank) . M.elems)
+                                (getUserMap nick)
+                Just ch -> fmap (maybe False ((>= expectRank) . rank))
+                                (getUser ch nick)
         ok <- hasPerm perm
         unless ok (fail "NOPERM")
 
@@ -332,7 +346,8 @@ bot' msg@(prefix, cmd, args) =
                                         $ concat p) events)
                   (sequence $ zipWith matchRegex argPattern args)
         doMatch [] = do let what = last args
-                        when (cmd == "PRIVMSG") (seenMsg from $ C.pack what)
+                        when (cmd == "PRIVMSG")
+                             (seenMsg channel from $ C.pack what)
                         when (args /= [] && isPrefixOf "!" what)
                              (putLog $ "NOMATCH " ++ showMsg msg)
         execute param event =
@@ -340,7 +355,7 @@ bot' msg@(prefix, cmd, args) =
             Send evCmd evArg -> ircSend "" evCmd (map param evArg)
             Say text      -> mapM_ reply (lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (lines $ param text)
-            Perm perm     -> requirePerm from prefix perm
+            Perm perm     -> requirePerm channel from prefix perm
             Join channel  -> ircSend "" "JOIN" [param channel]
             Quit msg      -> quitIrc (param msg)
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
@@ -357,9 +372,10 @@ bot' msg@(prefix, cmd, args) =
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $ bindArg prefix [from, from]) . nopermit . raw
         atErr str = putLog str >> ircSend from "NOTICE" [from, str]
-        replyTo = case args of
-                  (s@('#':_)):_ -> s
-                  _ -> from
+        replyTo = fromMaybe from channel
+        channel = case args of
+                  (s@('#':_)):_ -> Just s
+                  _ -> Nothing
         reply = say replyTo
         from = takeWhile (/= '!') prefix
 
