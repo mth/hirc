@@ -51,9 +51,8 @@ data EventSpec =
 data AllowSpec = Client Regex | Group String
 
 data Config = Config {
-    host :: String,
-    port :: Integer,
-    nick :: String,
+    servers  :: [(String, Integer)],
+    nick     :: String,
     encoding :: EncodingSpec,
     messages :: [(String, [EventSpec])],
     commands :: [(String, [String], [EventSpec])],
@@ -414,15 +413,18 @@ getConfig users =
         getPerm user = Client (mkRegex ('^':preparePermPattern user ++ "$"))
         rmComments = (flip $ subRegex (mkRegex "(^|\n)\\s*#[^\n]*")) ""
 
-reconnect connect =
-    appendFile "seen.dat" "\n" >>
-    catch connect (\ex -> do putStrLn ("Reconnect after 1 min: Error occured: "
-                                       ++ show ex)
-                             threadDelay 60000000
-                             putStrLn "Reconnecting..."
-                             reconnect connect)
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
-        config <- getConfig M.empty
-        let cfg = raw config
-        reconnect $ connectIrc (host cfg) (port cfg) (nick cfg) bot config
+        getConfig M.empty >>= connect 0
+  where connect nth config =
+             do let cfg = raw config
+                    servers' = servers cfg
+                    (host, port) = servers' !! (nth `mod` length servers')
+                appendFile "seen.dat" "\n"
+                catch (connectIrc host port (nick cfg) bot config)
+                      (failed nth config)
+        failed nth config ex =
+             do putStrLn ("Reconnect after 1 min: Error occured: " ++ show ex)
+                threadDelay 60000000
+                putStrLn "Reconnecting..."
+                connect (nth + 1) config

@@ -1,6 +1,5 @@
 Config {
-	host = "irc.datanet.ee",
-	port = 6667,
+	servers = [("irc.datanet.ee", 6667)],
 	nick = "Hircb0t",
 	messages = [
 		("^!quit$", [Perm "root", Quit "Returning to hell..."]),
