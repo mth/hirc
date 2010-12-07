@@ -390,7 +390,7 @@ createPatterns cfg = foldr addCmd M.empty
                                     M.alter (Just . maybe [bind] (bind:)) cmd
 
 preparePermPattern = subst "\\*" ".*" . subst "\\." "\\."
-    where subst pattern text = (flip $ subRegex (mkRegex pattern)) text
+  where subst pattern text = (flip $ subRegex (mkRegex pattern)) text
 
 getConfig users =
      do args <- getArgs
