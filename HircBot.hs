@@ -70,13 +70,17 @@ data PluginCmd = PluginMsg String String | KillPlugin
 type Bot a = Irc ConfigSt a
 type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
+data User = User {
+    rank :: Int,
+    spoke :: C.ByteString
+} deriving Eq
+
 data ConfigSt = ConfigSt {
     raw :: Config,
     encodeInput :: String -> String,
     patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
-    spoke :: T.HashTable String C.ByteString,
-    ranks :: T.HashTable String Int,
+    users :: T.HashTable String User,
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
@@ -165,35 +169,52 @@ execSys to prog argv =
 {-
  - SEEN
  -}
+getUser :: String -> Bot (Maybe User)
+getUser nick = ircConfig >>= liftIO . (`T.lookup` (lower nick)) . users
+
+updateUser :: (Maybe User -> Maybe User) -> String -> Bot (Maybe User)
+updateUser f nick = ircConfig >>= liftIO . update . users
+  where key = lower nick
+        update t = do
+            old <- T.lookup t key
+            let new = f old
+            when (old /= new) (maybe (T.delete t key) (set t) new)
+            return new
+        set t v = T.update t key v >> return ()
+
+updateRank :: (Int -> Int) -> String -> Bot (Maybe User)
+updateRank f nick = updateUser update nick
+  where update u = let r = f (maybe 0 rank u)
+                       s = maybe C.empty spoke u in
+                   if r == 0 && C.null s then Nothing
+                                         else Just (User {rank = r, spoke = s})
+
 seenMsg nick said =
-     do cfg <- ircConfig
-        liftIO (T.update (spoke cfg) (lower nick) said >> return ())
+    updateUser (\u -> Just (User {rank = maybe 0 rank u, spoke = said})) nick
+        >> return ()
 
 appendSeen :: [(String, Bool)] -> Bot ()
 appendSeen nicks =
-     do st <- fmap spoke ircConfig
-        TOD t' _ <- liftIO getClockTime
-        let t = show t'
-            format (nick, alive) =
-             let key = lower nick in
-             do said <- fmap (maybe "" C.unpack) (T.lookup st key)
-                T.delete st key
-                return (nick ++ '\t':(if alive then '+':t else t) ++ '\t':said)
-        liftIO (mapM format nicks >>= appendFile "seen.dat" . unlines)
+     do TOD t _ <- liftIO getClockTime
+        mapM (format (show t)) nicks >>=
+            liftIO . appendFile "seen.dat" . unlines
+  where clear = (>>= \u -> return $ u {spoke = C.empty})
+        format :: String -> (String, Bool) -> Bot String
+        format t (nick, alive) =
+         do user <- updateUser (if alive then const Nothing else clear) nick
+            let said = maybe "" (C.unpack . spoke) user
+            return (nick ++ '\t':(if alive then '+':t else t) ++ '\t':said)
 
 updateSeen what nick _ =
-     do appendSeen [(nick, what)]
-        unless what (ircConfig >>= liftIO . (`T.delete` nick) . ranks)
+     appendSeen [(nick, what)]
 seenEvent "JOIN" = updateSeen True
 seenEvent "PART" = updateSeen False
 seenEvent "QUIT" = updateSeen False
 seenEvent "NICK" = \old (new:_) ->
-                     do appendSeen [(old, False), (new, True)]
-                        t <- fmap ranks ircConfig
-                        liftIO $ do rank <- T.lookup t old
-                                    T.delete t old
-                                    T.update t new (fromMaybe 0 rank)
-                                    return ()
+                     do user <- getUser old
+                        appendSeen [(old, False), (new, True)]
+                        updateUser (const user) new
+                        return ()
 seenEvent "KICK" = \_ args -> case args of
                               (_:nick:_) -> updateSeen False nick []
                               _ -> return ()
@@ -205,12 +226,12 @@ seenEvent "353" = const $ register . words . last
         modeRank '%' = 2
         modeRank '+' = 1
         modeRank _ = 0
-        checkMode ranks (c:t) =
-            T.update ranks t (modeRank c) >> return ()
-        checkMode _ _ = return ()
+        checkMode (c:t) = updateRank (const (modeRank c)) t >> return ()
+        checkMode _ = return ()
         register names =
              do appendSeen (map stripTag names)
-                ircConfig >>= liftIO . (`mapM_` names) . checkMode . ranks
+                mapM_ checkMode names
+
 -- track mode changes for maintaining ranks
 seenEvent "MODE" = const atMode
   where atMode (_:m:args) = modes False m args
@@ -226,12 +247,10 @@ seenEvent "MODE" = const atMode
                             return args
             Nothing -> return args'
         mode _ _ _ = return []
-        setRank who rank =
-             do ranks <- fmap ranks ircConfig
-                old <- fmap (fromMaybe 0) $ liftIO $ T.lookup ranks who
-                let rank' = if rank == 0 || old < rank then rank else old
-                putLog ("setRank " ++ who ++ " = " ++ show rank')
-                liftIO $ T.update ranks who rank'
+        setRank who rank' =
+             do user <- updateRank (if rank' == 0 then const 0
+                                                  else max rank') who
+                putLog ("setRank " ++ who ++ " = " ++ show (maybe 0 rank user))
 seenEvent _ = \_ _ -> return ()
 
 {-
@@ -296,8 +315,7 @@ requirePerm nick prefix perm =
                 if ok then return True else anyPerm rest
             anyPerm [] = return False
             hasRank expectRank =
-             do rank <- liftIO $ T.lookup (ranks cfg) nick
-                return $ maybe False (>= expectRank) rank
+                getUser nick >>= return . maybe False ((>= expectRank) . rank)
         ok <- hasPerm perm
         unless ok (fail "NOPERM")
 
@@ -334,7 +352,7 @@ bot' msg@(prefix, cmd, args) =
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
             Calc text     -> ircCatch (reply $ calc $ param text) reply
             Rehash        -> killPlugins >>
-                ircConfig >>= liftIO . getConfig . ranks >>= ircSetConfig
+                ircConfig >>= liftIO . getConfig . users >>= ircSetConfig
             Exec prg args -> execSys replyTo prg (map param args)
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
@@ -362,10 +380,9 @@ createPatterns cfg = foldr addCmd M.empty
 preparePermPattern = subst "\\*" ".*" . subst "\\." "\\."
     where subst pattern text = (flip $ subRegex (mkRegex pattern)) text
 
-getConfig ranks =
+getConfig users =
      do args <- getArgs
         s <- fmap C.unpack $ C.readFile (fromMaybe "hircrc" $ listToMaybe args)
-        spoke <- T.new (==) T.hashString
         cfg <- return $! read (rmComments s)
         return $! ConfigSt {
             raw = cfg,
@@ -376,8 +393,7 @@ getConfig ranks =
             patterns = createPatterns cfg,
             perms = foldr addPerm M.empty (permits cfg),
             plugins = M.empty,
-            spoke = spoke,
-            ranks = ranks
+            users = users
         }
   where addPerm (perm, users) = let perms = map getPerm users in
                                 M.alter (Just . maybe perms (perms ++)) perm
@@ -394,7 +410,7 @@ reconnect connect =
                              reconnect connect)
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
-        ranks <- T.new (==) T.hashString
-        config <- getConfig ranks
+        users <- T.new (==) T.hashString
+        config <- getConfig users
         let cfg = raw config
         reconnect $ connectIrc (host cfg) (port cfg) (nick cfg) bot config
