@@ -197,6 +197,7 @@ seenMsg (Just channel) nick said = updateUser update channel nick
   where update u = Just (User {rank = maybe 0 rank u, spoke = said})
 seenMsg Nothing _ _ = return () -- private message
 
+-- XXX sharing seen.dat between channels is probably stupid, but whatever
 appendSeen :: [(String, Bool)] -> String -> Bot ()
 appendSeen nicks channel =
      do TOD t _ <- liftIO getClockTime
