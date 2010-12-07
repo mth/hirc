@@ -24,7 +24,6 @@ import Data.Char
 import Data.Maybe
 import Data.List
 import qualified Data.Map as M
-import qualified Data.HashTable as T
 import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
@@ -80,7 +79,7 @@ data ConfigSt = ConfigSt {
     encodeInput :: String -> String,
     patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
-    users :: T.HashTable String User,
+    users :: M.Map String User,
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
@@ -170,19 +169,14 @@ execSys to prog argv =
  - SEEN
  -}
 getUser :: String -> Bot (Maybe User)
-getUser nick = ircConfig >>= liftIO . (`T.lookup` (lower nick)) . users
+getUser nick = ircConfig >>= return . M.lookup (lower nick) . users
 
-updateUser :: (Maybe User -> Maybe User) -> String -> Bot (Maybe User)
-updateUser f nick = ircConfig >>= liftIO . update . users
-  where key = lower nick
-        update t = do
-            old <- T.lookup t key
-            let new = f old
-            when (old /= new) (maybe (T.delete t key) (set t) new)
-            return new
-        set t v = T.update t key v >> return ()
+updateUser :: (Maybe User -> Maybe User) -> String -> Bot ()
+updateUser f nick =
+     do cfg <- ircConfig
+        ircSetConfig cfg { users = M.alter f (lower nick) (users cfg) }
 
-updateRank :: (Int -> Int) -> String -> Bot (Maybe User)
+updateRank :: (Int -> Int) -> String -> Bot ()
 updateRank f nick = updateUser update nick
   where update u = let r = f (maybe 0 rank u)
                        s = maybe C.empty spoke u in
@@ -191,17 +185,18 @@ updateRank f nick = updateUser update nick
 
 seenMsg nick said =
     updateUser (\u -> Just (User {rank = maybe 0 rank u, spoke = said})) nick
-        >> return ()
 
 appendSeen :: [(String, Bool)] -> Bot ()
 appendSeen nicks =
      do TOD t _ <- liftIO getClockTime
         mapM (format (show t)) nicks >>=
             liftIO . appendFile "seen.dat" . unlines
-  where clear = (>>= \u -> return $ u {spoke = C.empty})
+  where clear alive u = if alive && rank u /= 0
+                            then return $ u {spoke = C.empty} else Nothing
         format :: String -> (String, Bool) -> Bot String
         format t (nick, alive) =
-         do user <- updateUser (if alive then const Nothing else clear) nick
+         do user <- getUser nick
+            updateUser (>>= clear alive) nick
             let said = maybe "" (C.unpack . spoke) user
             return (nick ++ '\t':(if alive then '+':t else t) ++ '\t':said)
 
@@ -214,7 +209,6 @@ seenEvent "NICK" = \old (new:_) ->
                      do user <- getUser old
                         appendSeen [(old, False), (new, True)]
                         updateUser (const user) new
-                        return ()
 seenEvent "KICK" = \_ args -> case args of
                               (_:nick:_) -> updateSeen False nick []
                               _ -> return ()
@@ -226,7 +220,7 @@ seenEvent "353" = const $ register . words . last
         modeRank '%' = 2
         modeRank '+' = 1
         modeRank _ = 0
-        checkMode (c:t) = updateRank (const (modeRank c)) t >> return ()
+        checkMode (c:t) = updateRank (const (modeRank c)) t
         checkMode _ = return ()
         register names =
              do appendSeen (map stripTag names)
@@ -248,8 +242,8 @@ seenEvent "MODE" = const atMode
             Nothing -> return args'
         mode _ _ _ = return []
         setRank who rank' =
-             do user <- updateRank (if rank' == 0 then const 0
-                                                  else max rank') who
+             do updateRank (if rank' == 0 then const 0 else max rank') who
+                user <- getUser who
                 putLog ("setRank " ++ who ++ " = " ++ show (maybe 0 rank user))
 seenEvent _ = \_ _ -> return ()
 
@@ -410,7 +404,6 @@ reconnect connect =
                              reconnect connect)
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
-        users <- T.new (==) T.hashString
-        config <- getConfig users
+        config <- getConfig M.empty
         let cfg = raw config
         reconnect $ connectIrc (host cfg) (port cfg) (nick cfg) bot config
