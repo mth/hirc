@@ -318,7 +318,7 @@ requirePerm channel nick prefix perm =
             anyPerm [] = return False
             hasRank expectRank =
                 -- It's idiotic to give perm based on rank on any channel,
-                -- but I can't think of better solution now for private chat
+                -- but I don't know a better solution now for private chat
                 case channel of
                 Nothing -> fmap (any (\u -> rank u >= expectRank) . M.elems)
                                 (getUserMap nick)
