@@ -56,8 +56,8 @@ stripCR str = reverse (case reverse str of
 readMsg :: (Monad m) => String -> m (String, String, [String])
 readMsg message =
     if args == [] then fail ("Invalid irc message: " ++ show message)
-                  else return (prefix, head args,
-                               tail args ++ [stripCR $ drop 1 final])
+                  else return $! (prefix, head args,
+                                  tail args ++ [stripCR $ drop 1 final])
   where (args, final) = first words (span (/= ':') msg)
         (prefix, msg) = case message of
                         ':' : s -> span (/= ' ') s
@@ -101,7 +101,7 @@ pingChecker ctx th = run
                  performGC -- just force GC on every 10 seconds
                  n <- modifyMVar (lastPong ctx) update
                  if n >= 300 then throwTo th (ErrorCall "ping timeout") else run
-        update x = let y = x + 10 in return (y, y)
+        update x = let y = x + 10 in return $! (y, y)
 
 processIrc handler = run wait
   where run p = ask >>= liftIO . hGetLine . conn >>= readMsg >>= p
@@ -149,7 +149,7 @@ connectIrc host port nick handler cfg =
 escape :: Irc c (Irc c a -> IO a)
 escape =
      do ctx <- ask
-        return (\action -> runReaderT action ctx)
+        return $! \action -> runReaderT action ctx
 
 ircCatch :: Irc c a -> (String -> Irc c a) -> Irc c a
 ircCatch action handler =

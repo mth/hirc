@@ -98,7 +98,7 @@ randLine :: String -> IO String
 randLine fn =
      do l <- fmap C.lines (C.readFile fn)
         n <- randomRIO (0, length l - 1)
-        format $! C.unpack $ l !! n
+        format $! C.unpack $! l !! n
   where format ('{':t) = snippet t "" []
         format (c:t) = fmap (c:) (format t)
         format "" = return ""
@@ -131,10 +131,10 @@ httpGet from uriStr body maxb re action =
             (do rsp <- H.simpleHTTP rq >>= either (fail . show) return
                 let code = H.rspCode rsp
                 when (code /= (2, 0, 0) && code /= (2,0,6)) (fail $ show $ code)
-                unlift $ maybe (putLog $ "HTTP NOMATCH: " ++ uriStr)
+                unlift $ maybe (putLog $! "HTTP NOMATCH: " ++ uriStr)
                                (action . bindArg "" . (from:))
-                               (matchRegex re $ take maxb $ H.rspBody rsp))
-            (\e -> print $ "HTTP " ++ uriStr ++ ": " ++ show e)
+                               (matchRegex re $! take maxb $! H.rspBody rsp))
+            (\e -> print $! "HTTP " ++ uriStr ++ ": " ++ show e)
         return ()
 
 {-
@@ -204,12 +204,12 @@ appendSeen nicks channel =
         mapM (format (show t)) nicks >>=
             liftIO . appendFile "seen.dat" . unlines
   where clear alive u = if alive && rank u /= 0
-                            then return $ u {spoke = C.empty} else Nothing
+                            then return $! u {spoke = C.empty} else Nothing
         format t (nick, alive) =
          do user <- getUser channel nick
             updateUser (>>= clear alive) channel nick
             let said = maybe "" (C.unpack . spoke) user
-            return (nick ++ '\t':(if alive then '+':t else t) ++ '\t':said)
+            return $! nick ++ '\t':(if alive then '+':t else t) ++ '\t':said
 
 seenEvent "JOIN" nick (channel:_)   = appendSeen [(nick, True)] channel
 seenEvent "PART" nick (channel:_)   = appendSeen [(nick, False)] channel
@@ -243,12 +243,12 @@ seenEvent "MODE" _ (channel:m:args') = modes False m args'
         modes _ ('-':m) args = modes False m args
         modes set (c:m) args = mode set c args >>= modes set m
         modes _ _ _ = return ()
-        mode _ c (_:args) | elem c "belkIR" = return args
+        mode _ c (_:args) | elem c "belkIR" = return $! args
         mode set c args'@(who:args) =
             case elemIndex c "vho" of
             Just rank -> do setRank who (if set then rank + 1 else 0)
-                            return args
-            Nothing -> return args'
+                            return $! args
+            Nothing -> return $! args'
         mode _ _ _ = return []
         setRank who rank' =
              do updateRank (if rank' == 0 then const 0 else max rank')
@@ -266,7 +266,7 @@ removePlugin id =
      do cfg <- ircConfig
         ircSetConfig cfg { plugins = M.delete id (plugins cfg) }
 
-killPlugins = ircConfig >>= mapM_ ($ KillPlugin) . M.elems . plugins
+killPlugins = ircConfig >>= mapM_ ($! KillPlugin) . M.elems . plugins
 
 startPlugin :: PluginId -> String -> Bot (PluginCmd -> Bot ())
 startPlugin id@(ExecPlugin (prog:argv)) replyTo =
@@ -298,7 +298,7 @@ startPlugin id _ = fail ("Illegal plugin id: " ++ show id)
 
 invokePlugin :: PluginId -> String -> String -> Bot ()
 invokePlugin id to msg =
-    ircConfig >>= maybe start ($ PluginMsg to msg) . M.lookup id . plugins
+    ircConfig >>= maybe start ($! PluginMsg to msg) . M.lookup id . plugins
   where start = do p <- startPlugin id to
                    cfg <- ircConfig
                    ircSetConfig cfg { plugins = M.insert id p (plugins cfg) }
@@ -313,10 +313,10 @@ requirePerm channel nick prefix perm =
             hasPerm "%" = hasRank 2
             hasPerm "@" = hasRank 3
             hasPerm perm =
-                anyPerm $ concat $ maybeToList $ M.lookup perm (perms cfg)
+                anyPerm $! concat $! maybeToList $! M.lookup perm (perms cfg)
             anyPerm (perm:rest) =
              do ok <- case perm of
-                      Client re -> return $ (matchRegex re prefix) /= Nothing
+                      Client re -> return $! (matchRegex re prefix) /= Nothing
                       Group group -> hasPerm group
                 if ok then return True else anyPerm rest
             anyPerm [] = return False
@@ -351,9 +351,9 @@ bot' msg@(prefix, cmd, args) =
                   (sequence $ zipWith matchRegex argPattern args)
         doMatch [] = do let what = last args
                         when (cmd == "PRIVMSG")
-                             (seenMsg channel from $ C.pack what)
+                             (seenMsg channel from $! C.pack what)
                         when (args /= [] && isPrefixOf "!" what)
-                             (putLog $ "NOMATCH " ++ showMsg msg)
+                             (putLog $! "NOMATCH " ++ showMsg msg)
         execute param event =
             case event of
             Send evCmd evArg -> ircSend "" evCmd (map param evArg)
@@ -374,7 +374,7 @@ bot' msg@(prefix, cmd, args) =
                         (\param -> mapM_ (execute param) events)
             Append file str -> liftIO $ appendFile file (param str)
         atErr "NOPERM" = ircConfig >>=
-                mapM_ (execute $ bindArg prefix [from, from]) . nopermit . raw
+                mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
         atErr str = putLog str >> ircSend from "NOTICE" [from, str]
         replyTo = fromMaybe from channel
         channel = case args of
