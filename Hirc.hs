@@ -32,6 +32,7 @@ import Network
 import System.IO
 import System.IO.Error (ioeGetErrorString, ioeGetErrorType, isUserErrorType)
 import System.Environment
+import System.Mem
 
 data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [String],
@@ -97,6 +98,7 @@ pinger ctx = run
 
 pingChecker ctx th = run
   where run = do threadDelay 10000000
+                 performGC -- just force GC on every 10 seconds
                  n <- modifyMVar (lastPong ctx) update
                  if n >= 300 then throwTo th (ErrorCall "ping timeout") else run
         update x = let y = x + 10 in return (y, y)
