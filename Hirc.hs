@@ -164,7 +164,7 @@ ircConfig :: Irc c c
 ircConfig = ask >>= liftIO . readIORef . config
 
 ircSetConfig :: c -> Irc c ()
-ircSetConfig cfg = ask >>= liftIO . (`writeIORef` cfg) . config
+ircSetConfig !cfg = ask >>= liftIO . (`writeIORef` cfg) . config
 
 myIrcNick :: Irc c String
 myIrcNick = ask >>= liftIO . readIORef . currentNick

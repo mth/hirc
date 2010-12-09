@@ -2,7 +2,7 @@
 # aptitude install ghc6 libghc6-mtl-dev libghc6-network-dev libghc6-http-dev libghc6-regex-compat-dev
 
 hirc: Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
-	ghc -o $@ -W -O2 --make $+
+	ghc -o $@ -W -O2 -XBangPatterns --make $+
 	strip $@
 
 # This can be used to convert old databases into utf-8

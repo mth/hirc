@@ -98,7 +98,7 @@ randLine :: String -> IO String
 randLine fn =
      do l <- fmap C.lines (C.readFile fn)
         n <- randomRIO (0, length l - 1)
-        format $ C.unpack $ l !! n
+        format $! C.unpack $ l !! n
   where format ('{':t) = snippet t "" []
         format (c:t) = fmap (c:) (format t)
         format "" = return ""
@@ -107,7 +107,7 @@ randLine fn =
              do let l = reverse a : r
                 n <- randomRIO (0, length l - 1)
                 rest <- format t
-                return $ (l !! n) ++ rest
+                return $! (l !! n) ++ rest
         snippet (c:t) a r = snippet t (c:a) r
         snippet "" a r = snippet "}" a r -- someone forget to add '}'?
 
@@ -178,8 +178,9 @@ getUser channel nick = fmap (M.lookup channel) (getUserMap nick)
 updateUserMap :: (M.Map String User -> M.Map String User) -> String -> Bot ()
 updateUserMap f nick =
      do cfg <- ircConfig
-        ircSetConfig cfg { users = M.alter modify (lower nick) (users cfg) }
- where modify m = let res = f $ fromMaybe M.empty m in
+        let !users' = M.alter modify (lower nick) (users cfg)
+        ircSetConfig cfg { users = users' }
+ where modify m = let res = f $! fromMaybe M.empty m in
                   if M.null res then Nothing else Just res
 
 updateUser :: (Maybe User -> Maybe User) -> String -> String -> Bot ()
