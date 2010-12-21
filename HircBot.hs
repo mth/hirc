@@ -24,6 +24,7 @@ import Data.Char
 import Data.Maybe
 import Data.List
 import qualified Data.Map as M
+import qualified Data.HashTable as H
 import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
@@ -79,7 +80,7 @@ data ConfigSt = ConfigSt {
     patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
     -- Map nick (Map channel User)
-    users :: M.Map String (M.Map String User),
+    users :: H.HashTable String (M.Map C.ByteString User),
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
@@ -168,37 +169,41 @@ execSys to prog argv =
 {-
  - SEEN
  -}
-getUserMap :: String -> Bot (M.Map String User)
+getUserMap :: String -> Bot (M.Map C.ByteString User)
 getUserMap nick =
-    fmap (M.findWithDefault M.empty (lower nick) . users) ircConfig
-
-getUser :: String -> String -> Bot (Maybe User)
-getUser channel nick = fmap (M.lookup channel) (getUserMap nick)
-
-updateUserMap :: (M.Map String User -> M.Map String User) -> String -> Bot ()
-updateUserMap f nick =
      do cfg <- ircConfig
-        let !users' = M.alter modify (lower nick) (users cfg)
-        ircSetConfig cfg { users = users' }
- where modify m = let res = f $! fromMaybe M.empty m in
-                  if M.null res then Nothing else Just res
+        res <- liftIO $ H.lookup (users cfg) (lower nick)
+        return $! fromMaybe M.empty res
 
-updateUser :: (Maybe User -> Maybe User) -> String -> String -> Bot ()
+getUser :: C.ByteString -> String -> Bot (Maybe User)
+getUser channel nick =
+    fmap (M.lookup channel) (getUserMap nick)
+
+updateUserMap :: (M.Map C.ByteString User -> M.Map C.ByteString User)
+                    -> String -> Bot ()
+updateUserMap f nick =
+     do t <- fmap users ircConfig
+        m <- fmap (f . fromMaybe M.empty) $ liftIO $ H.lookup t k
+        liftIO (if M.null m then H.delete t k
+                            else H.update t k m >> return ())
+ where k = lower nick
+
+updateUser :: (Maybe User -> Maybe User) -> C.ByteString -> String -> Bot ()
 updateUser f channel nick = updateUserMap (M.alter f channel) nick
 
-updateRank :: (Int -> Int) -> String -> String -> Bot ()
+updateRank :: (Int -> Int) -> C.ByteString -> String -> Bot ()
 updateRank f channel nick = updateUser update channel nick
   where update u = let r = f (maybe 0 rank u)
                        s = maybe C.empty spoke u in
                    if r == 0 && C.null s then Nothing
                                          else Just (User {rank = r, spoke = s})
 
-seenMsg (Just channel) nick said = updateUser update channel nick
+seenMsg (Just channel) nick said = updateUser update (C.pack channel) nick
   where update u = Just (User {rank = maybe 0 rank u, spoke = said})
 seenMsg Nothing _ _ = return () -- private message
 
 -- XXX sharing seen.dat between channels is probably stupid, but whatever
-appendSeen :: [(String, Bool)] -> String -> Bot ()
+appendSeen :: [(String, Bool)] -> C.ByteString -> Bot ()
 appendSeen nicks channel =
      do TOD t _ <- liftIO getClockTime
         mapM (format (show t)) nicks >>=
@@ -211,9 +216,12 @@ appendSeen nicks channel =
             let said = maybe "" (C.unpack . spoke) user
             return $! nick ++ '\t':(if alive then '+':t else t) ++ '\t':said
 
-seenEvent "JOIN" nick (channel:_)   = appendSeen [(nick, True)] channel
-seenEvent "PART" nick (channel:_)   = appendSeen [(nick, False)] channel
-seenEvent "KICK" _ (channel:nick:_) = appendSeen [(nick, False)] channel
+appendSeen' :: String -> Bool -> String -> Bot ()
+appendSeen' nick alive channel = appendSeen [(nick, alive)] (C.pack channel)
+
+seenEvent "JOIN" nick (channel:_)   = appendSeen' nick True channel
+seenEvent "PART" nick (channel:_)   = appendSeen' nick False channel
+seenEvent "KICK" _ (channel:nick:_) = appendSeen' nick False channel
 
 seenEvent "QUIT" nick _ =
     getUserMap nick >>= mapM_ (appendSeen [(nick, False)]) . M.keys
@@ -234,11 +242,12 @@ seenEvent "353" _ args =
         modeRank _ = 0
         checkMode (c:t) = updateRank (const (modeRank c)) channel t
         checkMode _ = return ()
-        (names:channel:_) = reverse args
+        (names:channel':_) = reverse args
+        channel = C.pack channel'
         nameList = words names
 
 -- track mode changes for maintaining ranks
-seenEvent "MODE" _ (channel:m:args') = modes False m args'
+seenEvent "MODE" _ (channel':m:args') = modes False m args'
   where modes _ ('+':m) args = modes True m args
         modes _ ('-':m) args = modes False m args
         modes set (c:m) args = mode set c args >>= modes set m
@@ -254,8 +263,9 @@ seenEvent "MODE" _ (channel:m:args') = modes False m args'
              do updateRank (if rank' == 0 then const 0 else max rank')
                            channel who
                 user <- getUser channel who
-                putLog ("setRank " ++ channel ++ ' ':who ++ " = " ++
+                putLog ("setRank " ++ channel' ++ ' ':who ++ " = " ++
                         show (maybe 0 rank user))
+        channel = C.pack channel'
 
 seenEvent _ _ _ = return ()
 
@@ -327,7 +337,7 @@ requirePerm channel nick prefix perm =
                 Nothing -> fmap (any (\u -> rank u >= expectRank) . M.elems)
                                 (getUserMap nick)
                 Just ch -> fmap (maybe False ((>= expectRank) . rank))
-                                (getUser ch nick)
+                                (getUser (C.pack ch) nick)
         ok <- hasPerm perm
         unless ok (fail "NOPERM")
 
@@ -417,7 +427,8 @@ getConfig users =
 
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
-        getConfig M.empty >>= connect 0
+        users <- H.new (==) H.hashString
+        getConfig users >>= connect 0
   where connect nth config =
              do let cfg = raw config
                     servers' = servers cfg

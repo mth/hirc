@@ -26,6 +26,7 @@ import Control.Arrow
 import Control.Concurrent
 import Control.Exception as E
 import Control.Monad.Reader
+import qualified Data.ByteString.Char8 as C
 import Data.IORef
 import Data.List
 import Network
@@ -35,7 +36,7 @@ import System.Environment
 import System.Mem
 
 data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
-                         sync :: MVar (), buffer :: Chan [String],
+                         sync :: MVar (), buffer :: Chan [C.ByteString],
                          config :: IORef c,
                          currentNick :: IORef String,
                          isQuit :: IORef Bool }
@@ -82,8 +83,10 @@ smartSplit at s =
 
 splitN n = takeWhile (not . null) . unfoldr (Just . smartSplit n)
 
-say !to text = mapM_ msg $! splitN 400 text
-  where msg !line = ask >>= liftIO . (`writeChan` [to, line]) . buffer
+say to text = mapM_ msg $! splitN 400 text
+  where msg line = let !line' = C.pack line in
+                   ask >>= liftIO . (`writeChan` [to', line']) . buffer
+        !to' = C.pack to
 
 quitIrc :: String -> Irc c ()
 quitIrc quitMsg =
@@ -130,8 +133,8 @@ connectIrc host port nick handler cfg =
         let ctx = IrcCtx h lastPong sync buf cfgRef nick' quit
             writer t = do threadDelay t
                           msg <- readChan buf
-                          runReaderT (ircSend "" "PRIVMSG" msg) ctx
-                          writer (sum (120 : map length msg) * 9000)
+                          runReaderT (ircSend "" "PRIVMSG" (map C.unpack msg)) ctx
+                          writer (sum (120 : map C.length msg) * 9000)
             ex (ErrorCall e) = fail e
             ioEx e | ioeGetErrorString e == "QUIT" = return ()
             ioEx e = do q <- readIORef quit
