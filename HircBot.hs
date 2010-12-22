@@ -30,9 +30,12 @@ import Control.Monad
 import Control.Concurrent
 import Text.Regex
 import System.Environment
+import System.Exit
 import System.Time
 import System.Random
+import System.Posix.IO
 import System.Posix.Signals
+import System.Posix.Process
 import System.Process
 import System.IO
 import qualified Network.HTTP as H
@@ -143,28 +146,41 @@ httpGet from uriStr body maxb re action =
  -}
 execSys :: String -> String -> [String] -> Bot ()
 execSys to prog argv =
-     do (inp, out, err, pid) <-
-            liftIO $ runInteractiveProcess prog argv Nothing Nothing
-        liftIO (do hClose inp
-                   hSetEncoding out latin1
-                   hSetEncoding err latin1)
-        sayTo <- fmap (. say to) escape
-        let copy h = liftIO $ forkIO $
-             do l <- fmap lines (hGetContents h)
-                mapM_ sayTo (take 50 l)
-                when (drop 50 l /= []) (sayTo "...")
-                hClose h
-        copy out
-        copy err
-        liftIO $ forkIO $ -- termination guard
-            do threadDelay 30000000
-               dead <- getProcessExitCode pid
-               when (dead == Nothing) $
-                     do terminateProcess pid
-                        sayTo ("Terminated " ++ dropPath prog)
-                        waitForProcess pid
-                        return ()
-        return ()
+     do sayTo <- fmap (. say to) escape
+        liftIO $ do (rd, wd) <- createPipe
+                    pid <- forkProcess (closeFd rd >> child wd)
+                    closeFd wd
+                    h <- fdToHandle rd
+                    forkIO $ copy sayTo h
+                    forkIO $ guard sayTo pid
+                    return ()
+  where tryClose fd = catch (closeFd fd) (const (return ()))
+        child wd =
+         do closeFd stdInput
+            dupTo wd stdOutput
+            dupTo wd stdError
+            closeFd wd
+            mapM_ (tryClose . toEnum) [3 .. 255]
+            executeFile prog False argv Nothing
+            fdWrite stdError "dead plugin walking"
+            exitImmediately (ExitFailure 127)
+        copy sayTo h =
+         do l <- fmap lines (hGetContents h)
+            mapM_ sayTo (take 50 l)
+            when (drop 50 l /= []) (sayTo "...")
+            hClose h
+        kill sig pid next =
+         do dead <- getProcessStatus False False pid
+            when (dead == Nothing) $
+                 do signalProcess sig pid
+                    next
+        guard sayTo pid =
+         do threadDelay 30000000
+            kill softwareTermination pid $
+                 do sayTo ("Terminated " ++ dropPath prog)
+                    threadDelay 1000000
+                    kill killProcess pid
+                         (getProcessStatus True False pid >> return ())
 
 {-
  - SEEN
