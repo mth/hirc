@@ -150,6 +150,7 @@ sysProcess input prog argv =
         pid <- forkProcess (closeFd rd >> child wd)
         closeFd wd
         h <- fdToHandle rd
+        hSetEncoding h latin1
         return (pid, h)
   where tryClose fd = catch (closeFd fd) (const (return ()))
         child wd =
@@ -311,6 +312,8 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                 (pid, fd) <- sysProcess (Just inputRd) prog argv
                 closeFd inputRd
                 h <- fdToHandle inputWd
+                hSetEncoding h latin1
+                hSetBuffering h LineBuffering
                 return (pid, h, fd)
         let sayTo s = readMVar to >>= unlift . (`say` s)
             output = do catch (hGetContents out >>= mapM_ sayTo . lines) print
@@ -326,10 +329,7 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                 (\e -> putStrLn (show id ++ ": " ++ show e) >>
                        unlift (kill >>
                                 say replyTo "\^AACTION has a ghost plugin\^A"))
-        liftIO $ do hSetEncoding inp latin1
-                    hSetEncoding out latin1
-                    hSetBuffering inp LineBuffering
-                    forkIO $ output
+        liftIO $ forkIO $ output
         return handler
 
 startPlugin id _ = fail ("Illegal plugin id: " ++ show id)
