@@ -36,7 +36,7 @@ import System.Random
 import System.Posix.IO
 import System.Posix.Signals
 import System.Posix.Process
-import System.Process
+import System.Posix.Types
 import System.IO
 import qualified Network.HTTP as H
 import Network.URI
@@ -144,27 +144,35 @@ httpGet from uriStr body maxb re action =
 {-
  - EXEC
  -}
-execSys :: String -> String -> [String] -> Bot ()
-execSys to prog argv =
-     do sayTo <- fmap (. say to) escape
-        liftIO $ do (rd, wd) <- createPipe
-                    pid <- forkProcess (closeFd rd >> child wd)
-                    closeFd wd
-                    h <- fdToHandle rd
-                    forkIO $ copy sayTo h
-                    forkIO $ guard sayTo pid
-                    return ()
+sysProcess :: Maybe Fd -> String -> [String] -> IO (ProcessID, Handle)
+sysProcess input prog argv =
+     do (rd, wd) <- createPipe
+        pid <- forkProcess (closeFd rd >> child wd)
+        closeFd wd
+        h <- fdToHandle rd
+        return (pid, h)
   where tryClose fd = catch (closeFd fd) (const (return ()))
         child wd =
-         do closeFd stdInput
-            dupTo wd stdOutput
-            dupTo wd stdError
+         do dupTo wd stdOutput
+            case input of
+                Just inp -> do dupTo inp stdInput
+                               closeFd inp
+                Nothing ->  do dupTo wd stdError
+                               closeFd stdInput
             closeFd wd
             mapM_ (tryClose . toEnum) [3 .. 255]
             executeFile prog False argv Nothing
             fdWrite stdError "dead plugin walking"
             exitImmediately (ExitFailure 127)
-        copy sayTo h =
+
+execSys :: String -> String -> [String] -> Bot ()
+execSys to prog argv =
+     do sayTo <- fmap (. say to) escape
+        liftIO $ do (pid, h) <- sysProcess Nothing prog argv
+                    forkIO $ copy sayTo h
+                    forkIO $ guard sayTo pid
+                    return ()
+  where copy sayTo h =
          do l <- fmap lines (hGetContents h)
             mapM_ sayTo (take 50 l)
             when (drop 50 l /= []) (sayTo "...")
@@ -298,15 +306,20 @@ startPlugin :: PluginId -> String -> Bot (PluginCmd -> Bot ())
 startPlugin id@(ExecPlugin (prog:argv)) replyTo =
      do to <- liftIO $ newMVar replyTo
         unlift <- escape
-        (inp, out, err, pid) <-
-            liftIO $ runInteractiveProcess prog argv Nothing Nothing
+        (pid, inp, out) <- liftIO $
+             do (inputRd, inputWd) <- createPipe
+                (pid, fd) <- sysProcess (Just inputRd) prog argv
+                closeFd inputRd
+                h <- fdToHandle inputWd
+                return (pid, h, fd)
         let sayTo s = readMVar to >>= unlift . (`say` s)
             output = do catch (hGetContents out >>= mapM_ sayTo . lines) print
                         unlift $ removePlugin id
                         hClose inp
-                        waitForProcess pid
+                        getProcessStatus True False pid
                         return ()
-            kill = removePlugin id >> liftIO (terminateProcess pid)
+            kill = removePlugin id >>
+                    liftIO (signalProcess softwareTermination pid)
             handler KillPlugin = kill
             handler (PluginMsg replyTo msg) = liftIO $ catch
                 (swapMVar to replyTo >> hPutStrLn inp msg)
@@ -317,7 +330,6 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                     hSetEncoding out latin1
                     hSetBuffering inp LineBuffering
                     forkIO $ output
-                    forkIO $ hGetContents err >>= putStr
         return handler
 
 startPlugin id _ = fail ("Illegal plugin id: " ++ show id)
