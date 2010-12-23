@@ -94,9 +94,11 @@ bindArg prefix bindings str =
     "" -> start
     '$':':':r -> start ++ prefix ++ bindArg prefix bindings r
     _ -> let (numStr, rest') = span isNumber (tail rest) in
-         let num = read numStr in
+         let !num = readNum numStr 0 in
          start ++ (if num < length bindings then bindings!!num else '$':numStr)
                ++ bindArg prefix bindings rest'
+  where readNum (c:cs) v = readNum cs (v * 10 + (ord c - 48))
+        readNum [] v = v
 
 randLine :: String -> IO String
 randLine fn =
@@ -208,23 +210,24 @@ updateUserMap :: (M.Map C.ByteString User -> M.Map C.ByteString User)
                     -> String -> Bot ()
 updateUserMap f nick =
      do t <- fmap users ircConfig
-        m <- fmap (f . fromMaybe M.empty) $ liftIO $ H.lookup t k
+        !m <- fmap (f . fromMaybe M.empty) $ liftIO $ H.lookup t k
         liftIO (if M.null m then H.delete t k
                             else H.update t k m >> return ())
  where k = lower nick
 
 updateUser :: (Maybe User -> Maybe User) -> C.ByteString -> String -> Bot ()
-updateUser f channel nick = updateUserMap (M.alter f channel) nick
+updateUser f !channel nick = updateUserMap (M.alter f channel) nick
 
 updateRank :: (Int -> Int) -> C.ByteString -> String -> Bot ()
 updateRank f channel nick = updateUser update channel nick
-  where update u = let r = f (maybe 0 rank u)
-                       s = maybe C.empty spoke u in
+  where update u = let !r = f (maybe 0 rank u)
+                       !s = maybe C.empty spoke u in
                    if r == 0 && C.null s then Nothing
                                          else Just (User {rank = r, spoke = s})
 
-seenMsg (Just channel) nick said = updateUser update (C.pack channel) nick
-  where update u = Just (User {rank = maybe 0 rank u, spoke = said})
+seenMsg (Just channel) nick !said = updateUser update (C.pack channel) nick
+  where update u = let !r = maybe 0 rank u in
+                   Just (User {rank = r, spoke = said})
 seenMsg Nothing _ _ = return () -- private message
 
 -- XXX sharing seen.dat between channels is probably stupid, but whatever

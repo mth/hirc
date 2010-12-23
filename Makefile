@@ -1,9 +1,15 @@
 # Use the following to install ghc with mtl and network libs on debian:
 # aptitude install ghc6 libghc6-mtl-dev libghc6-network-dev libghc6-http-dev libghc6-regex-compat-dev
 
-hirc: Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
+HIRC = Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
+
+hirc: $(HIRC)
 	ghc -o $@ -W -O2 -XBangPatterns --make $+
 	strip $@
+
+hirc-prof: $(HIRC)
+	ghc -o $@ -W -O2 -XBangPatterns --make $+\
+		-prof -auto-all -caf-all -fforce-recomp
 
 # This can be used to convert old databases into utf-8
 utf8-recode: Utf8Conv.hs Utf8Recode.hs
