@@ -375,13 +375,14 @@ requirePerm channel nick prefix perm =
         unless ok (fail "NOPERM")
 
 -- wrapper that encodes irc input into desired charset
-bot :: (String, String, [String]) -> Bot ()
-bot (prefix, cmd, args) =
+bot :: (C.ByteString, String, [C.ByteString]) -> Bot ()
+bot msg@(prefix, cmd, args) =
      do cfg <- ircConfig
-        bot' (prefix, cmd, map (encodeInput cfg) args)
+        bot' msg ((C.unpack prefix), cmd, map (encodeInput cfg . C.unpack) args)
 
-bot' :: (String, String, [String]) -> Bot ()
-bot' msg@(prefix, cmd, args) =
+bot' :: (C.ByteString, String, [C.ByteString])
+    -> (String, String, [String]) -> Bot ()
+bot' cmsg msg@(prefix, cmd, args) =
     ircCatch (seenEvent cmd from args)
              (putLog . (("seenEvent " ++ cmd ++ ": ") ++) . show) >>
     ircCatch (ircConfig >>= maybe (liftIO $ print msg) doMatch
@@ -396,15 +397,15 @@ bot' msg@(prefix, cmd, args) =
                         when (cmd == "PRIVMSG")
                              (seenMsg channel from $! C.pack what)
                         when (args /= [] && isPrefixOf "!" what)
-                             (putLog $! "NOMATCH " ++ showMsg msg)
+                             (putLog $! "NOMATCH " ++ C.unpack (showMsg cmsg))
         execute param event =
             case event of
-            Send evCmd evArg -> ircSend "" evCmd (map param evArg)
+            Send evCmd evArg -> ircSend C.empty evCmd (map (C.pack . param) evArg)
             Say text      -> mapM_ reply (lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (lines $ param text)
             Perm perm     -> requirePerm channel from prefix perm
-            Join channel  -> ircSend "" "JOIN" [param channel]
-            Quit msg      -> quitIrc (param msg)
+            Join channel  -> ircSend C.empty "JOIN" [C.pack $ param channel]
+            Quit msg      -> quitIrc (C.pack $ param msg)
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
             Calc text     -> ircCatch (reply $ calc $ param text) reply
             Rehash        -> killPlugins >>
@@ -418,13 +419,14 @@ bot' msg@(prefix, cmd, args) =
             Append file str -> liftIO $ appendFile file (param str)
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
-        atErr str = putLog str >> ircSend from "NOTICE" [from, str]
+        atErr str = putLog str >> ircSend cfrom "NOTICE" [cfrom, C.pack str]
         replyTo = fromMaybe from channel
         channel = case args of
                   (s@('#':_)):_ -> Just s
                   _ -> Nothing
         reply = say replyTo
         from = takeWhile (/= '!') prefix
+        cfrom = C.pack from
 
 createPatterns :: Config -> ConfigPatterns
 createPatterns cfg = foldr addCmd M.empty
