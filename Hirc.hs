@@ -38,42 +38,54 @@ import System.Mem
 data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [C.ByteString],
                          config :: IORef c,
-                         currentNick :: IORef String,
+                         currentNick :: IORef C.ByteString,
                          isQuit :: IORef Bool }
 type Irc c a = ReaderT (IrcCtx c) IO a
 
-showMsg :: (String, String, [String]) -> String
-showMsg ("", cmd, arg) = cmd ++ showArg arg
-showMsg (prefix, cmd, arg) = ':':prefix ++ ' ':cmd ++ showArg arg
+space = C.singleton ' '
+colon = C.singleton ':'
+spaceColon = C.pack " :"
 
-showArg [] = ""
-showArg [arg] = ' ':':':arg
-showArg (arg : rest) = ' ':arg ++ showArg rest
+showMsg :: (C.ByteString, String, [C.ByteString]) -> C.ByteString
+showMsg (prefix, cmd, arg) =
+    if C.null prefix then
+        C.pack cmd `C.append` showArg arg
+    else
+        C.concat [colon, prefix, C.pack (' ':cmd), showArg arg]
 
-stripCR str = reverse (case reverse str of
-                       '\r':s -> s
-                       s -> s)
+showArg args = C.concat (format args)
+  where format [] = []
+        format [arg] = [spaceColon, arg]
+        format (arg : rest) = space : arg : format rest
 
-readMsg :: (Monad m) => String -> m (String, String, [String])
+stripCR str =
+    if not (C.null str) && C.last str == '\r' then
+        C.take (C.length str - 1) str
+    else
+        str
+
+readMsg :: (Monad m) => C.ByteString -> m (C.ByteString, String, [C.ByteString])
 readMsg message =
     if args == [] then fail ("Invalid irc message: " ++ show message)
-                  else return $! (prefix, head args,
-                                  tail args ++ [stripCR $ drop 1 final])
-  where (args, final) = first words (span (/= ':') msg)
-        (prefix, msg) = case message of
-                        ':' : s -> span (/= ' ') s
-                        s -> ("", s)
+                  else return $! (prefix, C.unpack (head args),
+                                  tail args ++ [stripCR $ C.drop 1 final])
+  where (args, final) = first C.words (C.span (/= ':') msg)
+        (prefix, msg) =
+            if not (C.null message) && C.head message == ':' then
+                C.span (/= ' ') (C.tail message)
+            else
+                (C.empty, message)
 
-ircSend :: String -> String -> [String] -> Irc c ()
+ircSend :: C.ByteString -> String -> [C.ByteString] -> Irc c ()
 ircSend prefix cmd arg =
      do h <- fmap conn ask
         m <- fmap sync ask
         liftIO $ withMVar m $ \_ ->
-             do hPutStr h $ showMsg (prefix, cmd, arg)
+             do C.hPutStr h $ showMsg (prefix, cmd, arg)
                 hPutStr h "\r\n"
                 hFlush h
 
-ircCmd cmd what = ircSend "" cmd [what]
+ircCmd cmd what = ircSend C.empty cmd [what]
 
 smartSplit at s =
     if c == "" || rb' == "" then (a, c) else (reverse rb', reverse ra ++ c)
@@ -88,15 +100,17 @@ say to text = mapM_ msg $! splitN 400 text
                    ask >>= liftIO . (`writeChan` [to', line']) . buffer
         !to' = C.pack to
 
-quitIrc :: String -> Irc c ()
+quitIrc :: C.ByteString -> Irc c ()
 quitIrc quitMsg =
      do ask >>= liftIO . (`writeIORef` True) . isQuit
         ircCmd "QUIT" quitMsg
         fail "QUIT"
 
+alive = C.pack "alive"
+
 pinger ctx = run
   where run = do threadDelay (1000 * 1000 * 120)
-                 runReaderT (ircCmd "PING" "alive") ctx
+                 runReaderT (ircCmd "PING" alive) ctx
                  run
 
 pingChecker ctx th = run
@@ -107,19 +121,19 @@ pingChecker ctx th = run
         update x = let y = x + 10 in return $! (y, y)
 
 processIrc handler = run wait
-  where run p = ask >>= liftIO . hGetLine . conn >>= readMsg >>= p
-        process _ (_, "PING", param) = ircSend "" "PONG" param
+  where run p = ask >>= liftIO . C.hGetLine . conn >>= readMsg >>= p
+        process _ (_, "PING", param) = ircSend C.empty "PONG" param
         process _ (_, "PONG", _) =
             ask >>= liftIO . (`swapMVar` 0) . lastPong >> return ()
         process h msg@(_, cmd, nick:_) | cmd == "NICK" || cmd == "001" =
             ask >>= liftIO . (`writeIORef` nick) . currentNick >> h msg
         process h msg  = h msg
-        wait (_, "376", _) = handler ("", "CONNECTED", []) >> run ready
+        wait (_, "376", _) = handler (C.empty, "CONNECTED", []) >> run ready
         wait msg = process (const (return ())) msg >> run wait
         ready msg = process handler msg >> run ready
 
 connectIrc :: Integral a => String -> a -> String
-                         -> ((String, String, [String]) -> Irc c ())
+                         -> ((C.ByteString, String, [C.ByteString]) -> Irc c ())
                          -> c -> IO ()
 connectIrc host port nick handler cfg =
      do h <- connectTo host (PortNumber $ fromIntegral port)
@@ -128,12 +142,12 @@ connectIrc host port nick handler cfg =
         sync <- newMVar ()
         buf <- newChan
         cfgRef <- newIORef cfg
-        nick' <- newIORef nick
+        nick' <- newIORef cnick
         quit <- newIORef True
         let ctx = IrcCtx h lastPong sync buf cfgRef nick' quit
             writer t = do threadDelay t
                           msg <- readChan buf
-                          runReaderT (ircSend "" "PRIVMSG" (map C.unpack msg)) ctx
+                          runReaderT (ircSend C.empty "PRIVMSG" msg) ctx
                           writer (sum (120 : map C.length msg) * 9000)
             ex (ErrorCall e) = fail e
             ioEx e | ioeGetErrorString e == "QUIT" = return ()
@@ -145,9 +159,11 @@ connectIrc host port nick handler cfg =
         finally (E.catch (Prelude.catch (runReaderT run ctx) ioEx) ex)
                 (mapM_ killThread threads >> hClose h)
   where run = do user <- liftIO $ getEnv "USER"
-                 ircCmd "NICK" nick
-                 ircSend "" "USER" [user, "localhost", "unknown", nick]
+                 ircCmd "NICK" cnick
+                 ircSend C.empty "USER"
+                         (map C.pack [user, "localhost", "unknown"] ++ [cnick])
                  processIrc handler
+        cnick = C.pack nick
 
 escape :: Irc c (Irc c a -> IO a)
 escape =
@@ -169,5 +185,5 @@ ircConfig = ask >>= liftIO . readIORef . config
 ircSetConfig :: c -> Irc c ()
 ircSetConfig !cfg = ask >>= liftIO . (`writeIORef` cfg) . config
 
-myIrcNick :: Irc c String
+myIrcNick :: Irc c C.ByteString
 myIrcNick = ask >>= liftIO . readIORef . currentNick
