@@ -125,7 +125,7 @@ processIrc handler = run wait
         process _ (_, "PING", param) = ircSend C.empty "PONG" param
         process _ (_, "PONG", _) =
             ask >>= liftIO . (`swapMVar` 0) . lastPong >> return ()
-        process h msg@(_, cmd, nick:_) | cmd == "NICK" || cmd == "001" =
+        process h msg@(_, cmd, !nick:_) | cmd == "NICK" || cmd == "001" =
             ask >>= liftIO . (`writeIORef` nick) . currentNick >> h msg
         process h msg  = h msg
         wait (_, "376", _) = handler (C.empty, "CONNECTED", []) >> run ready
