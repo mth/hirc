@@ -87,12 +87,12 @@ data ConfigSt = ConfigSt {
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
-bindArg :: String -> [String] -> String -> String
+bindArg :: C.ByteString -> [String] -> String -> String
 bindArg prefix bindings str =
     let (start, rest) = span (/= '$') str in
     case rest of
     "" -> start
-    '$':':':r -> start ++ prefix ++ bindArg prefix bindings r
+    '$':':':r -> start ++ C.unpack prefix ++ bindArg prefix bindings r
     _ -> let (numStr, rest') = span isNumber (tail rest) in
          let !num = readNum numStr 0 in
          start ++ (if num < length bindings then bindings!!num else '$':numStr)
@@ -138,7 +138,7 @@ httpGet from uriStr body maxb re action =
                 let code = H.rspCode rsp
                 when (code /= (2, 0, 0) && code /= (2,0,6)) (fail $ show $ code)
                 unlift $ maybe (putLog $! "HTTP NOMATCH: " ++ uriStr)
-                               (action . bindArg "" . (from:))
+                               (action . bindArg C.empty . (from:))
                                (matchRegex re $! take maxb $! H.rspBody rsp))
             (\e -> print $! "HTTP " ++ uriStr ++ ": " ++ show e)
         return ()
@@ -378,10 +378,10 @@ requirePerm channel nick prefix perm =
 bot :: (C.ByteString, String, [C.ByteString]) -> Bot ()
 bot msg@(prefix, cmd, args) =
      do cfg <- ircConfig
-        bot' msg ((C.unpack prefix), cmd, map (encodeInput cfg . C.unpack) args)
+        bot' msg (prefix, cmd, map (encodeInput cfg . C.unpack) args)
 
 bot' :: (C.ByteString, String, [C.ByteString])
-    -> (String, String, [String]) -> Bot ()
+    -> (C.ByteString, String, [String]) -> Bot ()
 bot' cmsg msg@(prefix, cmd, args) =
     ircCatch (seenEvent cmd from args)
              (putLog . (("seenEvent " ++ cmd ++ ": ") ++) . show) >>
@@ -403,7 +403,7 @@ bot' cmsg msg@(prefix, cmd, args) =
             Send evCmd evArg -> ircSend C.empty evCmd (map (C.pack . param) evArg)
             Say text      -> mapM_ reply (lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (lines $ param text)
-            Perm perm     -> requirePerm channel from prefix perm
+            Perm perm     -> requirePerm channel from (C.unpack prefix) perm
             Join channel  -> ircSend C.empty "JOIN" [C.pack $ param channel]
             Quit msg      -> quitIrc (C.pack $ param msg)
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
@@ -425,8 +425,8 @@ bot' cmsg msg@(prefix, cmd, args) =
                   (s@('#':_)):_ -> Just s
                   _ -> Nothing
         reply = say replyTo
-        from = takeWhile (/= '!') prefix
-        cfrom = C.pack from
+        cfrom = C.takeWhile (/= '!') prefix
+        from = C.unpack cfrom
 
 createPatterns :: Config -> ConfigPatterns
 createPatterns cfg = foldr addCmd M.empty
