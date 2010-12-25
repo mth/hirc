@@ -62,7 +62,7 @@ data Config = Config {
     commands :: [(String, [String], [EventSpec])],
     permits  :: [(String, [String])],
     nopermit :: [EventSpec]
-} deriving (Read)
+} deriving Read
 
 data PluginId = ExecPlugin [String]
     deriving (Show, Eq, Ord)
@@ -75,7 +75,7 @@ type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 data User = User {
     rank :: Int,
     spoke :: C.ByteString
-} deriving Eq
+}
 
 data ConfigSt = ConfigSt {
     raw :: Config,
@@ -235,14 +235,16 @@ appendSeen :: [(String, Bool)] -> C.ByteString -> Bot ()
 appendSeen nicks channel =
      do TOD t _ <- liftIO getClockTime
         mapM (format (show t)) nicks >>=
-            liftIO . appendFile "seen.dat" . unlines
+            liftIO . C.appendFile "seen.dat" . C.unlines
   where clear alive u = if alive && rank u /= 0
                             then return $! u {spoke = C.empty} else Nothing
         format t (nick, alive) =
          do user <- getUser channel nick
             updateUser (>>= clear alive) channel nick
-            let said = maybe "" (C.unpack . spoke) user
-            return $! nick ++ '\t':(if alive then '+':t else t) ++ '\t':said
+            let said = maybe C.empty spoke user
+            return $! C.concat
+                [C.pack (nick ++ '\t':(if alive then '+':t else t)), tab, said]
+        tab = C.singleton '\t'
 
 appendSeen' :: String -> Bool -> String -> Bot ()
 appendSeen' nick alive channel = appendSeen [(nick, alive)] (C.pack channel)
