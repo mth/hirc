@@ -95,10 +95,9 @@ smartSplit at s =
 
 splitN n = takeWhile (not . null) . unfoldr (Just . smartSplit n)
 
-say to text = mapM_ msg $! splitN 400 text
+say !to text = mapM_ msg $! splitN 400 text
   where msg line = let !line' = C.pack line in
-                   ask >>= liftIO . (`writeChan` [to', line']) . buffer
-        !to' = C.pack to
+                   ask >>= liftIO . (`writeChan` [to, line']) . buffer
 
 quitIrc :: C.ByteString -> Irc c ()
 quitIrc quitMsg =

@@ -69,7 +69,7 @@ data Config = Config {
 data PluginId = ExecPlugin [String]
     deriving (Show, Eq, Ord)
 
-data PluginCmd = PluginMsg String String | KillPlugin
+data PluginCmd = PluginMsg C.ByteString String | KillPlugin
 
 type Bot a = Irc ConfigSt a
 type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
@@ -180,7 +180,7 @@ sysProcess input prog argv =
             fdWrite stdError "dead plugin walking"
             exitImmediately (ExitFailure 127)
 
-execSys :: String -> String -> [String] -> Bot ()
+execSys :: C.ByteString -> String -> [String] -> Bot ()
 execSys to prog argv =
      do sayTo <- fmap (. say to) escape
         liftIO $ do (pid, h) <- sysProcess Nothing prog argv
@@ -238,7 +238,7 @@ updateRank f channel nick = updateUser update channel nick
                    if r == 0 && C.null s then Nothing
                                          else Just (User {rank = r, spoke = s})
 
-seenMsg (Just channel) nick !said = updateUser update (C.pack channel) nick
+seenMsg (Just channel) nick !said = updateUser update channel nick
   where update u = let !r = maybe 0 rank u in
                    Just (User {rank = r, spoke = said})
 seenMsg Nothing _ _ = return () -- private message
@@ -321,7 +321,7 @@ removePlugin id =
 
 killPlugins = ircConfig >>= mapM_ ($! KillPlugin) . M.elems . plugins
 
-startPlugin :: PluginId -> String -> Bot (PluginCmd -> Bot ())
+startPlugin :: PluginId -> C.ByteString -> Bot (PluginCmd -> Bot ())
 startPlugin id@(ExecPlugin (prog:argv)) replyTo =
      do to <- liftIO $ newMVar replyTo
         unlift <- escape
@@ -352,7 +352,7 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
 
 startPlugin id _ = fail ("Illegal plugin id: " ++ show id)
 
-invokePlugin :: PluginId -> String -> String -> Bot ()
+invokePlugin :: PluginId -> C.ByteString -> String -> Bot ()
 invokePlugin id to msg =
     ircConfig >>= maybe start ($! PluginMsg to msg) . M.lookup id . plugins
   where start = do p <- startPlugin id to
@@ -362,7 +362,7 @@ invokePlugin id to msg =
 {-
  - CORE
  -}
-requirePerm :: Maybe C.ByteString -> C.ByteString -> String -> String -> Bot ()
+requirePerm :: Maybe C.ByteString -> C.ByteString -> C.ByteString -> String -> Bot ()
 requirePerm channel nick prefix perm =
      do cfg <- ircConfig
         let hasPerm "+" = hasRank 1
@@ -389,14 +389,13 @@ requirePerm channel nick prefix perm =
 
 -- wrapper that encodes irc input into desired charset
 bot :: (C.ByteString, String, [C.ByteString]) -> Bot ()
-bot msg@(prefix, cmd, args) =
+bot (prefix, cmd, args) =
      do cfg <- ircConfig
-        bot' msg (prefix, cmd, map (encodeInput cfg . C.unpack) args)
+        bot' (prefix, cmd, map (C.pack . encodeInput cfg . C.unpack) args)
 
-bot' :: (C.ByteString, String, [C.ByteString])
-    -> (C.ByteString, String, [String]) -> Bot ()
-bot' cmsg msg@(prefix, cmd, args) =
-    ircCatch (seenEvent cmd from args')
+bot' :: (C.ByteString, String, [C.ByteString]) -> Bot ()
+bot' msg@(prefix, cmd, args) =
+    ircCatch (seenEvent cmd from args)
              (putLog . (("seenEvent " ++ cmd ++ ": ") ++) . show) >>
     ircCatch (ircConfig >>= maybe (liftIO $ print msg) doMatch
                             . M.lookup cmd . patterns) atErr
@@ -405,19 +404,18 @@ bot' cmsg msg@(prefix, cmd, args) =
             else maybe (doMatch rest)
                   (\p -> mapM_ (execute $ bindArg prefix . (from:) . (++ [from])
                                         $ concat p) events)
-                  (sequence $ zipWith matchRegex argPattern args')
-        doMatch [] = do let what = last args'
+                  (sequence $ zipWith matchRegex argPattern args)
+        doMatch [] = do let what = last args
                         when (cmd == "PRIVMSG")
                              (seenMsg channel from $! what)
                         when (args /= [] && C.isPrefixOf (C.singleton '!') what)
-                             (cPutLog "NOMATCH " [showMsg cmsg])
+                             (cPutLog "NOMATCH " [showMsg msg])
         execute param event =
             case event of
             Send evCmd evArg -> ircSend C.empty evCmd (map (C.pack . param) evArg)
             Say text      -> mapM_ reply (lines $ param text)
-            SayTo to text -> mapM_ (say $ param to) (lines $ param text)
-            Perm perm     -> requirePerm (fmap C.pack channel) from
-                                         (C.unpack prefix) perm
+            SayTo to text -> mapM_ (say $ C.pack $ param to) (lines $ param text)
+            Perm perm     -> requirePerm channel from prefix perm
             Join channel  -> ircSend C.empty "JOIN" [C.pack $ param channel]
             Quit msg      -> quitIrc (C.pack $ param msg)
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
@@ -435,13 +433,12 @@ bot' cmsg msg@(prefix, cmd, args) =
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
         atErr str = putLog str >> ircSend from "NOTICE" [from, C.pack str]
-        replyTo = fromMaybe (C.unpack from) channel
+        replyTo = fromMaybe from channel
         channel = case args of
-                  (s@('#':_)):_ -> Just s
+                  s : _ | not (C.null s) && C.head s == '#' -> Just s
                   _ -> Nothing
         reply = say replyTo
         from = C.takeWhile (/= '!') prefix
-        args' = map C.pack args
 
 createPatterns :: Config -> ConfigPatterns
 createPatterns cfg = foldr addCmd M.empty
