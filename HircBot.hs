@@ -84,9 +84,11 @@ data ConfigSt = ConfigSt {
     patterns :: ConfigPatterns,
     perms :: M.Map String [AllowSpec],
     -- Map nick (Map channel User)
-    users :: H.HashTable String (M.Map C.ByteString User),
+    users :: H.HashTable C.ByteString (M.Map C.ByteString User),
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
+
+hashByteString s = H.hashInt (C.foldl' (\m c -> 5 * m + ord c) 0 s)
 
 matchRegex :: Regex -> C.ByteString -> Maybe [C.ByteString]
 matchRegex re value =
@@ -213,7 +215,7 @@ execSys to prog argv =
 getUserMap :: C.ByteString -> Bot (M.Map C.ByteString User)
 getUserMap nick =
      do cfg <- ircConfig
-        res <- liftIO $ H.lookup (users cfg) (C.unpack $ lower nick)
+        res <- liftIO $ H.lookup (users cfg) (lower nick)
         return $! fromMaybe M.empty res
 
 getUser :: C.ByteString -> C.ByteString -> Bot (Maybe User)
@@ -227,7 +229,7 @@ updateUserMap f nick =
         !m <- fmap (f . fromMaybe M.empty) $ liftIO $ H.lookup t k
         liftIO (if M.null m then H.delete t k
                             else H.update t k m >> return ())
- where k = C.unpack (lower nick)
+ where k = lower nick
 
 updateUser :: (Maybe User -> Maybe User)
                 -> C.ByteString -> C.ByteString -> Bot ()
@@ -483,7 +485,7 @@ getConfig users =
 
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
-        users <- H.new (==) H.hashString
+        users <- H.new (==) hashByteString
         getConfig users >>= connect 0
   where connect nth config =
              do let cfg = raw config
