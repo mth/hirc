@@ -29,7 +29,6 @@ import qualified Data.HashTable as H
 import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
-import Text.Regex (subRegex)
 import Text.Regex.Posix
 import System.Environment
 import System.Exit
@@ -454,13 +453,10 @@ createPatterns cfg = foldr addCmd M.empty
   where addCmd (cmd, args, event) = let bind = (map makeRegex args, event) in
                                     M.alter (Just . maybe [bind] (bind:)) cmd
 
-preparePermPattern = subst "\\*" ".*" . subst "\\." "\\."
-  where subst pattern text = (flip $ subRegex (makeRegex pattern)) text
-
 getConfig users =
      do args <- getArgs
-        s <- fmap C.unpack $ C.readFile (fromMaybe "hircrc" $ listToMaybe args)
-        cfg <- return $! read (rmComments s)
+        s <- C.readFile (fromMaybe "hircrc" $ listToMaybe args)
+        let !cfg = read $ C.unpack $! rmComments s
         return $! ConfigSt {
             raw = cfg,
             encodeInput = case encoding cfg of
@@ -475,8 +471,15 @@ getConfig users =
   where addPerm (perm, users) = let perms = map getPerm users in
                                 M.alter (Just . maybe perms (perms ++)) perm
         getPerm (':':group) = Group group
-        getPerm user = Client (makeRegex ('^':preparePermPattern user ++ "$"))
-        rmComments = (flip $ subRegex (makeRegex "(^|\n)\\s*#[^\n]*")) ""
+        getPerm user = Client (makeRegex ('^':permPattern user ++ "$"))
+        rmComments = C.unlines . filter notComment . C.lines
+        notComment s = let s' = C.dropWhile isSpace s in
+                       C.null s' || C.head s' /= '#'
+        permPattern (c:s) = case c of
+                            '*' -> '.':'*':permPattern s
+                            '.' -> '\\':'.':permPattern s
+                            _ -> c:permPattern s
+        permPattern "" = ""
 
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
