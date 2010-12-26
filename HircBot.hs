@@ -102,13 +102,13 @@ bindArg prefix bindings str = C.concat $! format $ C.pack str
             let (start, rest) = C.span (/= '$') str in
             if C.null rest then
                 [start]
-            else if C.isPrefixOf dollarColon rest then
-                start : prefix : format (C.drop 2 rest)
-            else case C.readInt rest of
-                Just (i, r) | i >= 0 && i < length bindings ->
-                    start : (bindings!!i) : format r
-                _ -> start : C.singleton '$' : format (C.tail rest)
-        dollarColon = C.pack "$:"
+            else let rest' = C.tail rest in
+                if not (C.null rest') && C.head rest' == ':' then
+                    start : prefix : format (C.tail rest)
+                else case C.readInt rest' of
+                    Just (i, r) | i >= 0 && i < length bindings ->
+                        start : (bindings!!i) : format r
+                    _ -> start : C.singleton '$' : format rest'
 
 randLine :: String -> IO String
 randLine fn =
