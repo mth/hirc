@@ -90,7 +90,8 @@ data ConfigSt = ConfigSt {
 }
 
 matchRegex :: Regex -> C.ByteString -> Maybe [C.ByteString]
-matchRegex re value = fmap (collect value 0 . elems) (matchOnce re value)
+matchRegex re value =
+    fmap (collect value 0 . drop 1 . elems) (matchOnce re value)
   where collect s ofs ((start, len) : rest) =
             let !s' = C.drop (start - ofs) s in
             C.take len s' : collect s' start rest
