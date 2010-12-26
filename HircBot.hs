@@ -97,8 +97,8 @@ matchRegex re value =
             C.take len s' : collect s' start rest
         collect _ _ [] = []
 
-bindArg :: C.ByteString -> [C.ByteString] -> String -> C.ByteString
-bindArg prefix bindings str = C.concat $! format $ C.pack str
+bindArg :: C.ByteString -> [C.ByteString] -> C.ByteString -> C.ByteString
+bindArg prefix bindings str = C.concat $! format str
   where format str =
             let (start, rest) = C.span (/= '$') str in
             if C.null rest then
@@ -111,22 +111,24 @@ bindArg prefix bindings str = C.concat $! format $ C.pack str
                         start : (bindings!!i) : format r
                     _ -> start : C.singleton '$' : format rest'
 
-randLine :: String -> IO String
+randLine :: String -> IO C.ByteString
 randLine fn =
      do l <- fmap C.lines (C.readFile fn)
         n <- randomRIO (0, length l - 1)
-        format $! C.unpack $! l !! n
-  where format ('{':t) = snippet t "" []
-        format (c:t) = fmap (c:) (format t)
-        format "" = return ""
-        snippet ('|':t) a r = snippet t "" (reverse a : r)
-        snippet ('}':t) a r =
-             do let l = reverse a : r
-                n <- randomRIO (0, length l - 1)
-                rest <- format t
-                return $! (l !! n) ++ rest
-        snippet (c:t) a r = snippet t (c:a) r
-        snippet "" a r = snippet "}" a r -- someone forget to add '}'?
+        parts <- format (C.copy (l !! n))
+        return $! C.concat parts
+  where format t = let (before, after) = C.span (/= '{') t
+                       (choice, rest) = C.span (/= '}') after in
+                   if C.null after then return [t]
+                        else do !s <- snippet (C.tail choice) []
+                                !r <- format (C.drop 1 rest)
+                                return $ before : s : r
+        snippet t a =
+            let (before, after) = C.span (/= '|') t in
+            if C.null after then
+                 do n <- randomRIO (0, length a)
+                    return $! (before : a) !! n
+                else snippet (C.tail after) (before : a)
 
 dropPath p = if s == "" then p else dropPath (tail s)
   where s = dropWhile (/= '/') p
@@ -411,7 +413,8 @@ bot' msg@(prefix, cmd, args) =
                              (seenMsg channel from $! what)
                         when (args /= [] && C.isPrefixOf (C.singleton '!') what)
                              (cPutLog "NOMATCH " [showMsg msg])
-        execute param event =
+        execute param' event =
+            let param = param' . C.pack in
             case event of
             Send evCmd evArg -> ircSend C.empty evCmd (map param evArg)
             Say text      -> mapM_ reply (C.lines $ param text)
@@ -419,7 +422,7 @@ bot' msg@(prefix, cmd, args) =
             Perm perm     -> requirePerm channel from prefix perm
             Join channel  -> ircSend C.empty "JOIN" [param channel]
             Quit msg      -> quitIrc (param msg)
-            RandLine fn   -> liftIO (randLine fn) >>= reply . param
+            RandLine fn   -> liftIO (randLine fn) >>= reply . param'
             Calc text     ->
                 let reply' = reply . C.pack in
                 ircCatch (reply' $ calc $ C.unpack $ param text) reply'
