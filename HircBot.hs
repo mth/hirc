@@ -131,6 +131,7 @@ dropPath p = if s == "" then p else dropPath (tail s)
   where s = dropWhile (/= '/') p
 
 putLog = liftIO . putStrLn
+cPutLog s l = liftIO $ C.putStrLn $ C.concat (C.pack s : l)
 lower = C.map toLower
 
 {-
@@ -306,8 +307,8 @@ seenEvent "MODE" _ (channel:m:args') = modes False (C.unpack m) args'
              do updateRank (if rank' == 0 then const 0 else max rank')
                            channel who
                 user <- getUser channel who
-                putLog ("setRank " ++ C.unpack channel ++ ' ':C.unpack who ++
-                        " = " ++ show (maybe 0 rank user))
+                cPutLog "setRank" [channel, C.singleton ' ', who,
+                                   C.pack $ " = " ++ show (maybe 0 rank user)]
 
 seenEvent _ _ _ = return ()
 
@@ -405,11 +406,11 @@ bot' cmsg msg@(prefix, cmd, args) =
                   (\p -> mapM_ (execute $ bindArg prefix . (from:) . (++ [from])
                                         $ concat p) events)
                   (sequence $ zipWith matchRegex argPattern args')
-        doMatch [] = do let what = last args
+        doMatch [] = do let what = last args'
                         when (cmd == "PRIVMSG")
-                             (seenMsg channel from $! C.pack what)
-                        when (args /= [] && isPrefixOf "!" what)
-                             (putLog $! "NOMATCH " ++ C.unpack (showMsg cmsg))
+                             (seenMsg channel from $! what)
+                        when (args /= [] && C.isPrefixOf (C.singleton '!') what)
+                             (cPutLog "NOMATCH " [showMsg cmsg])
         execute param event =
             case event of
             Send evCmd evArg -> ircSend C.empty evCmd (map (C.pack . param) evArg)
