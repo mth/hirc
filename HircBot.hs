@@ -103,7 +103,7 @@ bindArg prefix bindings str = C.concat $! format $ C.pack str
             let (start, rest) = C.span (/= '$') str in
             if C.null rest then
                 [start]
-            else let rest' = C.tail rest in
+            else let !rest' = C.tail rest in
                 if not (C.null rest') && C.head rest' == ':' then
                     start : prefix : format (C.tail rest')
                 else case C.readInt rest' of
