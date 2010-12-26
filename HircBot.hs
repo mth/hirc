@@ -20,6 +20,7 @@
 import Hirc
 import Utf8Conv
 import Calculator
+import Data.Array (elems)
 import Data.Char
 import Data.Maybe
 import Data.List
@@ -28,7 +29,8 @@ import qualified Data.HashTable as H
 import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
-import Text.Regex
+import Text.Regex (subRegex)
+import Text.Regex.Posix
 import System.Environment
 import System.Exit
 import System.Time
@@ -87,7 +89,14 @@ data ConfigSt = ConfigSt {
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
-bindArg :: C.ByteString -> [String] -> String -> String
+matchRegex :: Regex -> C.ByteString -> Maybe [C.ByteString]
+matchRegex re value = fmap (collect value 0 . elems) (matchOnce re value)
+  where collect s ofs ((start, len) : rest) =
+            let !s' = C.drop (start - ofs) s in
+            C.take len s' : collect s' start rest
+        collect _ _ [] = []
+
+bindArg :: C.ByteString -> [C.ByteString] -> String -> String
 bindArg prefix bindings str =
     let (start, rest) = span (/= '$') str in
     case rest of
@@ -95,7 +104,8 @@ bindArg prefix bindings str =
     '$':':':r -> start ++ C.unpack prefix ++ bindArg prefix bindings r
     _ -> let (numStr, rest') = span isNumber (tail rest) in
          let !num = readNum numStr 0 in
-         start ++ (if num < length bindings then bindings!!num else '$':numStr)
+         start ++ (if num < length bindings
+                      then C.unpack (bindings!!num) else '$':numStr)
                ++ bindArg prefix bindings rest'
   where readNum (c:cs) v = readNum cs (v * 10 + (ord c - 48))
         readNum [] v = v
@@ -121,7 +131,7 @@ dropPath p = if s == "" then p else dropPath (tail s)
   where s = dropWhile (/= '/') p
 
 putLog = liftIO . putStrLn
-lower = map toLower
+lower = C.map toLower
 
 {-
  - HTTP
@@ -139,7 +149,8 @@ httpGet from uriStr body maxb re action =
                 when (code /= (2, 0, 0) && code /= (2,0,6)) (fail $ show $ code)
                 unlift $ maybe (putLog $! "HTTP NOMATCH: " ++ uriStr)
                                (action . bindArg C.empty . (from:))
-                               (matchRegex re $! take maxb $! H.rspBody rsp))
+                               (matchRegex re $! C.take maxb $ C.pack
+                                                $ H.rspBody rsp))
             (\e -> print $! "HTTP " ++ uriStr ++ ": " ++ show e)
         return ()
 
@@ -196,29 +207,30 @@ execSys to prog argv =
 {-
  - SEEN
  -}
-getUserMap :: String -> Bot (M.Map C.ByteString User)
+getUserMap :: C.ByteString -> Bot (M.Map C.ByteString User)
 getUserMap nick =
      do cfg <- ircConfig
-        res <- liftIO $ H.lookup (users cfg) (lower nick)
+        res <- liftIO $ H.lookup (users cfg) (C.unpack $ lower nick)
         return $! fromMaybe M.empty res
 
-getUser :: C.ByteString -> String -> Bot (Maybe User)
+getUser :: C.ByteString -> C.ByteString -> Bot (Maybe User)
 getUser channel nick =
     fmap (M.lookup channel) (getUserMap nick)
 
 updateUserMap :: (M.Map C.ByteString User -> M.Map C.ByteString User)
-                    -> String -> Bot ()
+                    -> C.ByteString -> Bot ()
 updateUserMap f nick =
      do t <- fmap users ircConfig
         !m <- fmap (f . fromMaybe M.empty) $ liftIO $ H.lookup t k
         liftIO (if M.null m then H.delete t k
                             else H.update t k m >> return ())
- where k = lower nick
+ where k = C.unpack (lower nick)
 
-updateUser :: (Maybe User -> Maybe User) -> C.ByteString -> String -> Bot ()
+updateUser :: (Maybe User -> Maybe User)
+                -> C.ByteString -> C.ByteString -> Bot ()
 updateUser f !channel nick = updateUserMap (M.alter f channel) nick
 
-updateRank :: (Int -> Int) -> C.ByteString -> String -> Bot ()
+updateRank :: (Int -> Int) -> C.ByteString -> C.ByteString -> Bot ()
 updateRank f channel nick = updateUser update channel nick
   where update u = let !r = f (maybe 0 rank u)
                        !s = maybe C.empty spoke u in
@@ -231,7 +243,7 @@ seenMsg (Just channel) nick !said = updateUser update (C.pack channel) nick
 seenMsg Nothing _ _ = return () -- private message
 
 -- XXX sharing seen.dat between channels is probably stupid, but whatever
-appendSeen :: [(String, Bool)] -> C.ByteString -> Bot ()
+appendSeen :: [(C.ByteString, Bool)] -> C.ByteString -> Bot ()
 appendSeen nicks channel =
      do TOD t _ <- liftIO getClockTime
         mapM (format (show t)) nicks >>=
@@ -243,12 +255,13 @@ appendSeen nicks channel =
             updateUser (>>= clear alive) channel nick
             let said = maybe C.empty spoke user
             return $! C.concat
-                [C.pack (nick ++ '\t':(if alive then '+':t else t)), tab, said]
+                [nick, C.pack ('\t':(if alive then '+':t else t)), tab, said]
         tab = C.singleton '\t'
 
-appendSeen' :: String -> Bool -> String -> Bot ()
-appendSeen' nick alive channel = appendSeen [(nick, alive)] (C.pack channel)
+appendSeen' :: C.ByteString -> Bool -> C.ByteString -> Bot ()
+appendSeen' nick alive channel = appendSeen [(nick, alive)] channel
 
+seenEvent :: String -> C.ByteString -> [C.ByteString] -> Bot ()
 seenEvent "JOIN" nick (channel:_)   = appendSeen' nick True channel
 seenEvent "PART" nick (channel:_)   = appendSeen' nick False channel
 seenEvent "KICK" _ (channel:nick:_) = appendSeen' nick False channel
@@ -264,20 +277,20 @@ seenEvent "NICK" old (new:_) =
 seenEvent "353" _ args =
      do appendSeen (map stripTag nameList) channel
         mapM_ checkMode nameList
-  where stripTag s@(c:t) = (if c `elem` " +@%" then t else s, True)
-        stripTag s = (s, True)
+  where stripTag s =
+            (if not (C.null s) && C.head s `elem` " +@%" then
+                C.tail s else s, True)
         modeRank '@' = 3
         modeRank '%' = 2
         modeRank '+' = 1
         modeRank _ = 0
-        checkMode (c:t) = updateRank (const (modeRank c)) channel t
-        checkMode _ = return ()
-        (names:channel':_) = reverse args
-        channel = C.pack channel'
-        nameList = words names
+        checkMode s | C.null s = return ()
+        checkMode s = updateRank (\_ -> modeRank $ C.head s) channel (C.tail s)
+        (names:channel:_) = reverse args
+        nameList = C.words names
 
 -- track mode changes for maintaining ranks
-seenEvent "MODE" _ (channel':m:args') = modes False m args'
+seenEvent "MODE" _ (channel:m:args') = modes False (C.unpack m) args'
   where modes _ ('+':m) args = modes True m args
         modes _ ('-':m) args = modes False m args
         modes set (c:m) args = mode set c args >>= modes set m
@@ -293,9 +306,8 @@ seenEvent "MODE" _ (channel':m:args') = modes False m args'
              do updateRank (if rank' == 0 then const 0 else max rank')
                            channel who
                 user <- getUser channel who
-                putLog ("setRank " ++ channel' ++ ' ':who ++ " = " ++
-                        show (maybe 0 rank user))
-        channel = C.pack channel'
+                putLog ("setRank " ++ C.unpack channel ++ ' ':C.unpack who ++
+                        " = " ++ show (maybe 0 rank user))
 
 seenEvent _ _ _ = return ()
 
@@ -349,7 +361,7 @@ invokePlugin id to msg =
 {-
  - CORE
  -}
-requirePerm :: Maybe String -> String -> String -> String -> Bot ()
+requirePerm :: Maybe C.ByteString -> C.ByteString -> String -> String -> Bot ()
 requirePerm channel nick prefix perm =
      do cfg <- ircConfig
         let hasPerm "+" = hasRank 1
@@ -359,7 +371,7 @@ requirePerm channel nick prefix perm =
                 anyPerm $! concat $! maybeToList $! M.lookup perm (perms cfg)
             anyPerm (perm:rest) =
              do ok <- case perm of
-                      Client re -> return $! (matchRegex re prefix) /= Nothing
+                      Client re -> return $! (matchOnce re prefix) /= Nothing
                       Group group -> hasPerm group
                 if ok then return True else anyPerm rest
             anyPerm [] = return False
@@ -370,7 +382,7 @@ requirePerm channel nick prefix perm =
                 Nothing -> fmap (any (\u -> rank u >= expectRank) . M.elems)
                                 (getUserMap nick)
                 Just ch -> fmap (maybe False ((>= expectRank) . rank))
-                                (getUser (C.pack ch) nick)
+                                (getUser ch nick)
         ok <- hasPerm perm
         unless ok (fail "NOPERM")
 
@@ -383,7 +395,7 @@ bot msg@(prefix, cmd, args) =
 bot' :: (C.ByteString, String, [C.ByteString])
     -> (C.ByteString, String, [String]) -> Bot ()
 bot' cmsg msg@(prefix, cmd, args) =
-    ircCatch (seenEvent cmd from args)
+    ircCatch (seenEvent cmd from args')
              (putLog . (("seenEvent " ++ cmd ++ ": ") ++) . show) >>
     ircCatch (ircConfig >>= maybe (liftIO $ print msg) doMatch
                             . M.lookup cmd . patterns) atErr
@@ -392,7 +404,7 @@ bot' cmsg msg@(prefix, cmd, args) =
             else maybe (doMatch rest)
                   (\p -> mapM_ (execute $ bindArg prefix . (from:) . (++ [from])
                                         $ concat p) events)
-                  (sequence $ zipWith matchRegex argPattern args)
+                  (sequence $ zipWith matchRegex argPattern args')
         doMatch [] = do let what = last args
                         when (cmd == "PRIVMSG")
                              (seenMsg channel from $! C.pack what)
@@ -403,7 +415,8 @@ bot' cmsg msg@(prefix, cmd, args) =
             Send evCmd evArg -> ircSend C.empty evCmd (map (C.pack . param) evArg)
             Say text      -> mapM_ reply (lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (lines $ param text)
-            Perm perm     -> requirePerm channel from (C.unpack prefix) perm
+            Perm perm     -> requirePerm (fmap C.pack channel) from
+                                         (C.unpack prefix) perm
             Join channel  -> ircSend C.empty "JOIN" [C.pack $ param channel]
             Quit msg      -> quitIrc (C.pack $ param msg)
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
@@ -414,30 +427,31 @@ bot' cmsg msg@(prefix, cmd, args) =
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
                 httpGet from (param uri) (param body) maxb
-                        (mkRegexWithOpts pattern False False)
+                        (makeRegexOpts (compIgnoreCase + compExtended)
+                                       execBlank pattern)
                         (\param -> mapM_ (execute param) events)
             Append file str -> liftIO $ appendFile file (param str)
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
-        atErr str = putLog str >> ircSend cfrom "NOTICE" [cfrom, C.pack str]
-        replyTo = fromMaybe from channel
+        atErr str = putLog str >> ircSend from "NOTICE" [from, C.pack str]
+        replyTo = fromMaybe (C.unpack from) channel
         channel = case args of
                   (s@('#':_)):_ -> Just s
                   _ -> Nothing
         reply = say replyTo
-        cfrom = C.takeWhile (/= '!') prefix
-        from = C.unpack cfrom
+        from = C.takeWhile (/= '!') prefix
+        args' = map C.pack args
 
 createPatterns :: Config -> ConfigPatterns
 createPatterns cfg = foldr addCmd M.empty
     (commands cfg ++
         map (\(pattern, event) -> ("PRIVMSG", ["", pattern], event))
             (messages cfg))
-  where addCmd (cmd, args, event) = let bind = (map mkRegex args, event) in
+  where addCmd (cmd, args, event) = let bind = (map makeRegex args, event) in
                                     M.alter (Just . maybe [bind] (bind:)) cmd
 
 preparePermPattern = subst "\\*" ".*" . subst "\\." "\\."
-  where subst pattern text = (flip $ subRegex (mkRegex pattern)) text
+  where subst pattern text = (flip $ subRegex (makeRegex pattern)) text
 
 getConfig users =
      do args <- getArgs
@@ -457,8 +471,8 @@ getConfig users =
   where addPerm (perm, users) = let perms = map getPerm users in
                                 M.alter (Just . maybe perms (perms ++)) perm
         getPerm (':':group) = Group group
-        getPerm user = Client (mkRegex ('^':preparePermPattern user ++ "$"))
-        rmComments = (flip $ subRegex (mkRegex "(^|\n)\\s*#[^\n]*")) ""
+        getPerm user = Client (makeRegex ('^':preparePermPattern user ++ "$"))
+        rmComments = (flip $ subRegex (makeRegex "(^|\n)\\s*#[^\n]*")) ""
 
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
