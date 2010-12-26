@@ -69,7 +69,7 @@ data Config = Config {
 data PluginId = ExecPlugin [String]
     deriving (Show, Eq, Ord)
 
-data PluginCmd = PluginMsg C.ByteString String | KillPlugin
+data PluginCmd = PluginMsg C.ByteString C.ByteString | KillPlugin
 
 type Bot a = Irc ConfigSt a
 type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
@@ -96,19 +96,19 @@ matchRegex re value = fmap (collect value 0 . elems) (matchOnce re value)
             C.take len s' : collect s' start rest
         collect _ _ [] = []
 
-bindArg :: C.ByteString -> [C.ByteString] -> String -> String
-bindArg prefix bindings str =
-    let (start, rest) = span (/= '$') str in
-    case rest of
-    "" -> start
-    '$':':':r -> start ++ C.unpack prefix ++ bindArg prefix bindings r
-    _ -> let (numStr, rest') = span isNumber (tail rest) in
-         let !num = readNum numStr 0 in
-         start ++ (if num < length bindings
-                      then C.unpack (bindings!!num) else '$':numStr)
-               ++ bindArg prefix bindings rest'
-  where readNum (c:cs) v = readNum cs (v * 10 + (ord c - 48))
-        readNum [] v = v
+bindArg :: C.ByteString -> [C.ByteString] -> String -> C.ByteString
+bindArg prefix bindings str = C.concat $! format $ C.pack str
+  where format str =
+            let (start, rest) = C.span (/= '$') str in
+            if C.null rest then
+                [start]
+            else if C.isPrefixOf dollarColon rest then
+                start : prefix : format (C.drop 2 rest)
+            else case C.readInt rest of
+                Just (i, r) | i >= 0 && i < length bindings ->
+                    start : (bindings!!i) : format r
+                _ -> start : C.singleton '$' : format (C.tail rest)
+        dollarColon = C.pack "$:"
 
 randLine :: String -> IO String
 randLine fn =
@@ -180,10 +180,10 @@ sysProcess input prog argv =
             fdWrite stdError "dead plugin walking"
             exitImmediately (ExitFailure 127)
 
-execSys :: C.ByteString -> String -> [String] -> Bot ()
+execSys :: C.ByteString -> String -> [C.ByteString] -> Bot ()
 execSys to prog argv =
-     do sayTo <- fmap (. say to) escape
-        liftIO $ do (pid, h) <- sysProcess Nothing prog argv
+     do sayTo <- fmap (. say to . C.pack) escape
+        liftIO $ do (pid, h) <- sysProcess Nothing prog (map C.unpack argv)
                     forkIO $ copy sayTo h
                     forkIO $ guard sayTo pid
                     return ()
@@ -333,7 +333,7 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                 hSetEncoding h latin1
                 hSetBuffering h LineBuffering
                 return (pid, h, fd)
-        let sayTo s = readMVar to >>= unlift . (`say` s)
+        let sayTo s = readMVar to >>= unlift . (`say` (C.pack s))
             output = do catch (hGetContents out >>= mapM_ sayTo . lines) print
                         unlift $ removePlugin id
                         hClose inp
@@ -343,16 +343,16 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                     liftIO (signalProcess softwareTermination pid)
             handler KillPlugin = kill
             handler (PluginMsg replyTo msg) = liftIO $ catch
-                (swapMVar to replyTo >> hPutStrLn inp msg)
+                (swapMVar to replyTo >> C.hPutStrLn inp msg)
                 (\e -> putStrLn (show id ++ ": " ++ show e) >>
-                       unlift (kill >>
-                                say replyTo "\^AACTION has a ghost plugin\^A"))
+                       unlift (kill >> say replyTo ghost))
         liftIO $ forkIO $ output
         return handler
+  where ghost = C.pack "\^AACTION has a ghost plugin\^A"
 
 startPlugin id _ = fail ("Illegal plugin id: " ++ show id)
 
-invokePlugin :: PluginId -> C.ByteString -> String -> Bot ()
+invokePlugin :: PluginId -> C.ByteString -> C.ByteString -> Bot ()
 invokePlugin id to msg =
     ircConfig >>= maybe start ($! PluginMsg to msg) . M.lookup id . plugins
   where start = do p <- startPlugin id to
@@ -412,24 +412,26 @@ bot' msg@(prefix, cmd, args) =
                              (cPutLog "NOMATCH " [showMsg msg])
         execute param event =
             case event of
-            Send evCmd evArg -> ircSend C.empty evCmd (map (C.pack . param) evArg)
-            Say text      -> mapM_ reply (lines $ param text)
-            SayTo to text -> mapM_ (say $ C.pack $ param to) (lines $ param text)
+            Send evCmd evArg -> ircSend C.empty evCmd (map param evArg)
+            Say text      -> mapM_ reply (C.lines $ param text)
+            SayTo to text -> mapM_ (say $ param to) (C.lines $ param text)
             Perm perm     -> requirePerm channel from prefix perm
-            Join channel  -> ircSend C.empty "JOIN" [C.pack $ param channel]
-            Quit msg      -> quitIrc (C.pack $ param msg)
+            Join channel  -> ircSend C.empty "JOIN" [param channel]
+            Quit msg      -> quitIrc (param msg)
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
-            Calc text     -> ircCatch (reply $ calc $ param text) reply
+            Calc text     ->
+                let reply' = reply . C.pack in
+                ircCatch (reply' $ calc $ C.unpack $ param text) reply'
             Rehash        -> killPlugins >>
                 ircConfig >>= liftIO . getConfig . users >>= ircSetConfig
             Exec prg args -> execSys replyTo prg (map param args)
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
-                httpGet from (param uri) (param body) maxb
+                httpGet from (C.unpack $ param uri) (C.unpack $ param body) maxb
                         (makeRegexOpts (compIgnoreCase + compExtended)
                                        execBlank pattern)
                         (\param -> mapM_ (execute param) events)
-            Append file str -> liftIO $ appendFile file (param str)
+            Append file str -> liftIO $ C.appendFile file (param str)
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
         atErr str = putLog str >> ircSend from "NOTICE" [from, C.pack str]

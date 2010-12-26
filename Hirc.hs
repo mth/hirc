@@ -88,16 +88,16 @@ ircSend prefix cmd arg =
 ircCmd cmd what = ircSend C.empty cmd [what]
 
 smartSplit at s =
-    if c == "" || rb' == "" then (a, c) else (reverse rb', reverse ra ++ c)
-  where (a, c) = splitAt at s
-        (ra, rb) = span (/= ' ') (reverse a)
-        rb' = dropWhile (== ' ') rb
+    if C.null c || C.null rb' then (a, c)
+                              else (C.reverse rb', C.append (C.reverse ra) c)
+  where (a, c) = C.splitAt at s
+        (ra, rb) = C.span (/= ' ') (C.reverse a)
+        rb' = C.dropWhile (== ' ') rb
 
-splitN n = takeWhile (not . null) . unfoldr (Just . smartSplit n)
+splitN n = takeWhile (not . C.null) . unfoldr (Just . smartSplit n)
 
 say !to text = mapM_ msg $! splitN 400 text
-  where msg line = let !line' = C.pack line in
-                   ask >>= liftIO . (`writeChan` [to, line']) . buffer
+  where msg !line = ask >>= liftIO . (`writeChan` [to, line]) . buffer
 
 quitIrc :: C.ByteString -> Irc c ()
 quitIrc quitMsg =
