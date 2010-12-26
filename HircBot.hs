@@ -104,7 +104,7 @@ bindArg prefix bindings str = C.concat $! format $ C.pack str
                 [start]
             else let rest' = C.tail rest in
                 if not (C.null rest') && C.head rest' == ':' then
-                    start : prefix : format (C.tail rest)
+                    start : prefix : format (C.tail rest')
                 else case C.readInt rest' of
                     Just (i, r) | i >= 0 && i < length bindings ->
                         start : (bindings!!i) : format r
