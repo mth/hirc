@@ -183,19 +183,19 @@ sysProcess input prog argv =
             fdWrite stdError "dead plugin walking"
             exitImmediately (ExitFailure 127)
 
+readInput :: (Maybe Int) -> Handle -> (C.ByteString -> IO ()) -> IO () -> IO ()
+readInput limit h f cleanup = catch (copy limit) (\_ -> hClose h >> cleanup)
+  where copy (Just limit) | limit <= 0 = f (C.pack "...")
+        copy limit = C.hGetLine h >>= f >> copy (fmap (+ (-1)) limit)
+
 execSys :: C.ByteString -> String -> [C.ByteString] -> Bot ()
 execSys to prog argv =
-     do sayTo <- fmap (. say to . C.pack) escape
+     do sayTo <- fmap (. say to) escape
         liftIO $ do (pid, h) <- sysProcess Nothing prog (map C.unpack argv)
-                    forkIO $ copy sayTo h
+                    forkIO $ readInput (Just 50) h sayTo (return ())
                     forkIO $ guard sayTo pid
                     return ()
-  where copy sayTo h =
-         do l <- fmap lines (hGetContents h)
-            mapM_ sayTo (take 50 l)
-            when (drop 50 l /= []) (sayTo "...")
-            hClose h
-        kill sig pid next =
+  where kill sig pid next =
          do dead <- getProcessStatus False False pid
             when (dead == Nothing) $
                  do signalProcess sig pid
@@ -203,7 +203,7 @@ execSys to prog argv =
         guard sayTo pid =
          do threadDelay 30000000
             kill softwareTermination pid $
-                 do sayTo ("Terminated " ++ dropPath prog)
+                 do sayTo (C.pack $ "Terminated " ++ dropPath prog)
                     threadDelay 1000000
                     kill killProcess pid
                          (getProcessStatus True False pid >> return ())
@@ -336,12 +336,12 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                 hSetEncoding h latin1
                 hSetBuffering h LineBuffering
                 return (pid, h, fd)
-        let sayTo s = readMVar to >>= unlift . (`say` (C.pack s))
-            output = do catch (hGetContents out >>= mapM_ sayTo . lines) print
-                        unlift $ removePlugin id
-                        hClose inp
-                        getProcessStatus True False pid
-                        return ()
+        let sayTo s = readMVar to >>= unlift . (`say` s)
+            output = readInput Nothing out sayTo $
+                         do unlift (removePlugin id)
+                            hClose inp
+                            getProcessStatus True False pid
+                            return ()
             kill = removePlugin id >>
                     liftIO (signalProcess softwareTermination pid)
             handler KillPlugin = kill
