@@ -88,7 +88,7 @@ data ConfigSt = ConfigSt {
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
-hashByteString s = H.hashInt (C.foldl' (\m c -> 5 * m + ord c) 0 s)
+hashByteString s = H.hashInt (C.foldl' (\m c -> 31 * m + ord c) 0 s)
 
 matchRegex :: Regex -> C.ByteString -> Maybe [C.ByteString]
 matchRegex re value =
