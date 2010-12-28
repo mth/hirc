@@ -92,11 +92,10 @@ hashByteString s = H.hashInt (C.foldl' (\m c -> 31 * m + ord c) 0 s)
 
 matchRegex :: Regex -> C.ByteString -> Maybe [C.ByteString]
 matchRegex re value =
-    fmap (collect value 0 . drop 1 . elems) (matchOnce re value)
-  where collect s ofs ((start, len) : rest) =
-            let !s' = C.drop (start - ofs) s in
-            C.take len s' : collect s' start rest
-        collect _ _ [] = []
+    fmap (collect . drop 1 . elems) (matchOnce re value)
+  where collect ((start, len) : rest) =
+            C.take len (C.drop start value) : collect rest
+        collect [] = []
 
 bindArg :: C.ByteString -> [C.ByteString] -> C.ByteString -> C.ByteString
 bindArg prefix bindings str = C.concat $! format str
