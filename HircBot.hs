@@ -64,7 +64,7 @@ instance Read Regex where
             parse (c:cs) acc = parse cs $! c:acc
             parse "" _ = [] in
         parse s ""
-    readsPrec x (c:(!cs)) | isSpace c = readsPrec x cs
+    readsPrec x (c:cs) | isSpace c = readsPrec x cs
     readsPrec _ _ = []
 
 data Config = Config {
