@@ -55,12 +55,24 @@ data EventSpec =
 
 data AllowSpec = Client Regex | Group String
 
+instance Read Regex where
+    readsPrec _ ('/':(!s)) =
+        let parse ('\\':'x':a:b:cs) acc =
+                parse cs $! chr ((ord a - 48) * 16 + ord b - 48) : acc
+            parse ('\\':'/':cs) acc = parse cs $! '/':acc
+            parse ('/':cs) acc = [(makeRegex $! C.reverse $! C.pack acc, cs)]
+            parse (c:cs) acc = parse cs $! c:acc
+            parse "" _ = [] in
+        parse s ""
+    readsPrec x (c:(!cs)) | isSpace c = readsPrec x cs
+    readsPrec _ _ = []
+
 data Config = Config {
     servers  :: [(String, Integer)],
     nick     :: String,
     encoding :: EncodingSpec,
-    messages :: [(String, [EventSpec])],
-    commands :: [(String, [String], [EventSpec])],
+    messages :: [(Regex, [EventSpec])],
+    commands :: [(String, [Regex], [EventSpec])],
     permits  :: [(String, [String])],
     nopermit :: [EventSpec]
 } deriving Read
@@ -449,10 +461,11 @@ bot' msg@(prefix, cmd, args) =
 createPatterns :: Config -> ConfigPatterns
 createPatterns cfg = foldr addCmd M.empty
     (commands cfg ++
-        map (\(pattern, event) -> ("PRIVMSG", ["", pattern], event))
+        map (\(pattern, event) -> ("PRIVMSG", [emptyRegex, pattern], event))
             (messages cfg))
-  where addCmd (cmd, args, event) = let bind = (map makeRegex args, event) in
+  where addCmd (cmd, args, event) = let bind = (args, event) in
                                     M.alter (Just . maybe [bind] (bind:)) cmd
+        emptyRegex = makeRegex ""
 
 getConfig users =
      do args <- getArgs
