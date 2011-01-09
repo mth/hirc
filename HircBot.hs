@@ -46,11 +46,12 @@ data EncodingSpec = Utf8 | Latin1 | Raw
     deriving Read
 
 data EventSpec =
-    Send String [String] | Say String | SayTo String String |
-    Join String | Quit String | Perm String | RandLine String |
-    Exec String [String] | Plugin [String] String |
-    Http String String Int String [EventSpec] | Calc String |
-    Append String String | Rehash
+    Send String [C.ByteString] |
+    Say C.ByteString | SayTo C.ByteString C.ByteString |
+    Join C.ByteString | Quit C.ByteString | Perm String | RandLine String |
+    Exec String [C.ByteString] | Plugin [String] C.ByteString |
+    Http C.ByteString C.ByteString Int String [EventSpec] |
+    Calc C.ByteString | Append String C.ByteString | Rehash
     deriving Read
 
 data AllowSpec = Client Regex | Group String
@@ -425,8 +426,7 @@ bot' msg@(prefix, cmd, args) =
                              (seenMsg channel from $! what)
                         when (args /= [] && C.isPrefixOf (C.singleton '!') what)
                              (cPutLog "NOMATCH " [showMsg msg])
-        execute param' event =
-            let param = param' . C.pack in
+        execute param event =
             case event of
             Send evCmd evArg -> ircSend C.empty evCmd (map param evArg)
             Say text      -> mapM_ reply (C.lines $ param text)
@@ -434,7 +434,7 @@ bot' msg@(prefix, cmd, args) =
             Perm perm     -> requirePerm channel from prefix perm
             Join channel  -> ircSend C.empty "JOIN" [param channel]
             Quit msg      -> quitIrc (param msg)
-            RandLine fn   -> liftIO (randLine fn) >>= reply . param'
+            RandLine fn   -> liftIO (randLine fn) >>= reply . param
             Calc text     ->
                 let reply' = reply . C.pack in
                 ircCatch (reply' $ calc $ C.unpack $ param text) reply'
