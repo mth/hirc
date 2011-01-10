@@ -50,7 +50,7 @@ data EventSpec =
     Say C.ByteString | SayTo C.ByteString C.ByteString |
     Join C.ByteString | Quit C.ByteString | Perm String | RandLine String |
     Exec String [C.ByteString] | Plugin [String] C.ByteString |
-    Http C.ByteString C.ByteString Int String [EventSpec] |
+    Http C.ByteString C.ByteString Int C.ByteString [EventSpec] |
     Calc C.ByteString | Append String C.ByteString | Rehash
     deriving Read
 
