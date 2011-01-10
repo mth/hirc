@@ -50,7 +50,7 @@ data EventSpec =
     Say C.ByteString | SayTo C.ByteString C.ByteString |
     Join C.ByteString | Quit C.ByteString | Perm String | RandLine String |
     Exec String [C.ByteString] | Plugin [String] C.ByteString |
-    Http C.ByteString C.ByteString Int C.ByteString [EventSpec] |
+    Http C.ByteString C.ByteString Int Regex [EventSpec] |
     Calc C.ByteString | Append String C.ByteString | Rehash
     deriving Read
 
@@ -61,6 +61,9 @@ instance Read Regex where
         let parse ('\\':'x':a:b:cs) acc =
                 parse cs $! chr ((ord a - 48) * 16 + ord b - 48) : acc
             parse ('\\':'/':cs) acc = parse cs $! '/':acc
+            parse ('/':'i':cs) acc =
+                [(makeRegexOpts (compIgnoreCase + compExtended) execBlank
+                                $! C.reverse $! C.pack acc, cs)]
             parse ('/':cs) acc = [(makeRegex $! C.reverse $! C.pack acc, cs)]
             parse (c:cs) acc = parse cs $! c:acc
             parse "" _ = [] in
@@ -444,9 +447,7 @@ bot' msg@(prefix, cmd, args) =
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
                 httpGet from (C.unpack $ param uri) (C.unpack $ param body) maxb
-                        (makeRegexOpts (compIgnoreCase + compExtended)
-                                       execBlank pattern)
-                        (\param -> mapM_ (execute param) events)
+                        pattern (\param -> mapM_ (execute param) events)
             Append file str -> liftIO $ C.appendFile file (param str)
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
