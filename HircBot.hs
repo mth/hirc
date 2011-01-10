@@ -156,7 +156,7 @@ lower = C.map toLower
 {-
  - HTTP
  -}
-httpGet from uriStr body maxb re action =
+httpGet uriStr body maxb re action =
      do uri <- maybe (fail $ "Bad URI: " ++ uriStr) return (parseURI uriStr)
         unlift <- escape
         let hdr = [H.Header H.HdrRange ("bytes=0-" ++ show maxb)]
@@ -167,8 +167,7 @@ httpGet from uriStr body maxb re action =
             (do rsp <- H.simpleHTTP rq >>= either (fail . show) return
                 let code = H.rspCode rsp
                 when (code /= (2, 0, 0) && code /= (2,0,6)) (fail $ show $ code)
-                unlift $ maybe (putLog $! "HTTP NOMATCH: " ++ uriStr)
-                               (action . bindArg C.empty . (from:))
+                unlift $ maybe (putLog $! "HTTP NOMATCH: " ++ uriStr) action
                                (matchRegex re $! C.take maxb $ C.pack
                                                 $ H.rspBody rsp))
             (\e -> print $! "HTTP " ++ uriStr ++ ": " ++ show e)
@@ -446,8 +445,9 @@ bot' msg@(prefix, cmd, args) =
             Exec prg args -> execSys replyTo prg (map param args)
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
-                httpGet from (C.unpack $ param uri) (C.unpack $ param body) maxb
-                        pattern (\param -> mapM_ (execute param) events)
+                httpGet (C.unpack $ param uri) (C.unpack $ param body) maxb
+                        pattern (\param ->
+                           mapM_ (execute $ bindArg prefix $ from:param) events)
             Append file str -> liftIO $ C.appendFile file (param str)
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
