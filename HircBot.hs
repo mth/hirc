@@ -61,12 +61,12 @@ instance Read Regex where
         let parse ('\\':'x':a:b:cs) acc =
                 parse cs $! chr ((ord a - 48) * 16 + ord b - 48) : acc
             parse ('\\':'/':cs) acc = parse cs $! '/':acc
-            parse ('/':'i':cs) acc =
-                [(makeRegexOpts (compIgnoreCase + compExtended) execBlank
-                                $! C.reverse $! C.pack acc, cs)]
-            parse ('/':cs) acc = [(makeRegex $! C.reverse $! C.pack acc, cs)]
+            parse ('/':'i':cs) acc = [(regex compIgnoreCase acc, cs)]
+            parse ('/':cs) acc = [(regex 0 acc, cs)]
             parse (c:cs) acc = parse cs $! c:acc
-            parse "" _ = [] in
+            parse "" _ = []
+            regex opt s = makeRegexOpts (opt + compExtended) execBlank
+                            $! C.reverse $! C.pack s in
         parse s ""
     readsPrec x (c:cs) | isSpace c = readsPrec x cs
     readsPrec _ _ = []
