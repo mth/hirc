@@ -34,6 +34,7 @@ import System.IO
 import System.IO.Error (ioeGetErrorString, ioeGetErrorType, isUserErrorType)
 import System.Environment
 import System.Mem
+import System.Random
 
 data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [C.ByteString],
@@ -128,6 +129,13 @@ processIrc handler = run wait
             ask >>= liftIO . (`writeIORef` nick) . currentNick >> h msg
         process h msg  = h msg
         wait (_, "376", _) = handler (C.empty, "CONNECTED", []) >> run ready
+        wait (_, "432", _) = liftIO $ fail "Invalid nick"
+        wait (_, "433", _) = 
+             do n <- liftIO $ randomRIO (10 :: Int, 9999)
+                oldnick <- myIrcNick
+                ircSend C.empty "NICK"
+                        [C.take 8 oldnick `C.append` C.pack (show n)]
+                run wait
         wait msg = process (const (return ())) msg >> run wait
         ready msg = process handler msg >> run ready
 
