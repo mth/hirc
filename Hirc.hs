@@ -164,7 +164,8 @@ connectIrc host port nick handler cfg =
         threads <- sequence $ map forkIO [
             pinger ctx, pingChecker ctx mainThread, writer 1]
         finally (E.catch (Prelude.catch (runReaderT run ctx) ioEx) ex)
-                (mapM_ killThread threads >> hClose h)
+                (finally (runReaderT (handler (C.empty, "TERMINATE", [])) ctx)
+                         (mapM_ killThread threads >> hClose h))
   where run = do user <- liftIO $ getEnv "USER"
                  ircCmd "NICK" cnick
                  ircSend C.empty "USER"

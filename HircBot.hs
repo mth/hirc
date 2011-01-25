@@ -328,6 +328,8 @@ seenEvent "MODE" _ (channel:m:args') = modes False (C.unpack m) args'
                 cPutLog "setRank" [channel, C.singleton ' ', who,
                                    C.pack $ " = " ++ show (maybe 0 rank user)]
 
+seenEvent "TERMINATE" _ _ = killPlugins
+
 seenEvent _ _ _ = return ()
 
 {-
