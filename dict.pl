@@ -5,6 +5,8 @@ my $DICT = "base.dict";
 my %dict;
 my @new_;
 my $newPos = 0;
+my $HTML_DIR = "$ENV{HOME}/public_html/tux";
+my $HTML_URL = "http://linux.ee/~mzz/tux";
 
 $| = 1;
 
@@ -34,8 +36,41 @@ for (my $i = $newPos + $MAX_NEW; --$i >= $newPos;) {
 }
 @new_ = ();
 
+sub mkhash {
+	my ($s) = @_;
+	my $x = 0;
+	$x = (($x & 0x7fffff) << 5) ^ ($x >> 23) ^ ord $& while $s =~ s/^.//s;
+	sprintf "%x", $x
+}
+
+sub html_escape {
+	for (@_) {
+		s/&/&amp;/sg;
+		s/</&lt;/sg;
+		s/>/&gt;/sg;
+		s/"/&quot;/sg;
+	}
+}
+
+sub get_long_text {
+	my ($k, $s) = @_;
+	return $s if length $s < 790;
+	my $h = mkhash(lc $k);
+	my $f;
+	return $s unless open $f, '>', "$HTML_DIR/$h.html";
+	html_escape($k, $s);
+	$s =~ s/\|/<LI>/sg;
+	$s =~ s/https?:\/\/[^ ,"<]+/<A href="$&">$&<\/A>/sig;
+	print $f <<HTMLTEXT;
+<HTML><HEAD><META http-equiv="Content-Type" content="text/html; charset=utf-8">
+<TITLE>$k</TITLE><BODY><H1>$k</H1><UL><LI>$s</UL></BODY></HTML>
+HTMLTEXT
+	close $f;
+	"$HTML_URL/$h.html"
+}
+
 sub def_key {
-	my ($msg, $name, $val, $loser) = @_;
+	my ($msg, $name, $val, $loser, $old, $fix) = @_;
 	$name =~ tr/\t\n/  /;
 	$val =~ tr/\t\n/  /;
 	my ($s, $m, $h, $D, $M, $Y) = localtime(time);
@@ -47,6 +82,7 @@ sub def_key {
 		$name, $val, $Y + 1900, $M + 1, $D, $h, $m, $s, $loser;
 	close F;
 	if ($val) {
+		$val =~ s/^ *\Q$name - \E(.)/$1/s if $fix;
 		my $key = lc $name;
 		$dict{$key} = [$name, $val];
 		if (lc $new[0] ne $key) {
@@ -56,13 +92,14 @@ sub def_key {
 	} else {
 		$name = lc $name;
 		delete $dict{$name};
-		@new = grep {lc $_ eq $name} @new
+		@new = grep {lc $_ ne $name} @new
 	}
 	print $msg, "\n"
 }
 
 sub find {
 	my $s = lc $_[0];
+	$s = $1 if $s =~ /^'(.*)'$/s or $s =~ /^"(.*)"$/s;
 	my %rr;
 	while ((my ($k, $def) = each %dict)) {
 		my ($name, $val) = @{$def};
@@ -83,7 +120,7 @@ sub find {
 	}
 	my @r = sort {$rr{$b} <=> $rr{$a}} (keys %rr);
 	@r = @r[0..29] if @r > 30;
-	print join(", ", @r), "\n" if @r;
+	print "? " . join(", ", @r), "\n" if @r;
 	@r
 }
 
@@ -96,12 +133,12 @@ my %modify = (
 		} elsif ($_[0] =~ / \| /) {
 			print "Toru on halb\n"
 		} else {
-			def_key("Jätsin meelde: $_[0]", @_)
+			def_key("Jätsin meelde: $_[0]", @_, 1)
 		}
 	},
 	'!brainwash' => sub {
 		if ($_[3]) {
-			def_key("Uuendasin $_[0]", @_)
+			def_key("Uuendasin $_[0]", @_, 1)
 		} else {
 			print "Ma ei mäleta enam, mis $_[0] on.\n"
 		}
@@ -136,6 +173,7 @@ while (<STDIN>) {
 				my @parts = split(/\s+\|\s+/, $val);
 				$val = $parts[$at - 1];
 			}
+			$val = get_long_text($key, $val);
 			print "$key - $val\n";
 		} elsif (!$at and !find($_)) {
 			print "$_ ei eksisteeri\n"
@@ -143,8 +181,8 @@ while (<STDIN>) {
 	} elsif ($cmd eq '!?') {
 		find($_) or print "Mis $_?\n"
 	} elsif ($modify{$cmd}) {
-		if (/^((?:[\w+ .-]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
-		    /^((?:[\w+ .-]|[^\x00-\x80])+?)\s+(\S.*)$/) {
+		if (/^((?:[\w+ .#-]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
+		    /^((?:[\w+ .#-]|[^\x00-\x80])+?)\s+(\S.*)$/) {
 			my $val;
 			if (my $def = $dict{lc $1}) {
 				(my $name, $val) = @{$def};
@@ -173,5 +211,8 @@ while (<STDIN>) {
 		}
 	} elsif ($cmd eq '!new') {
 		print join(', ', @new), "\n" if @new;
+	} elsif ($cmd eq '!stat') {
+		my $count = keys %dict;
+		print "Baasis on $count definitsiooni.\n"
 	}
 }
