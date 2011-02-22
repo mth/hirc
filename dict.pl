@@ -55,11 +55,11 @@ sub html_escape {
 sub get_long_text {
 	my ($k, $s) = @_;
 	return $s if length $s < 790;
-	my $h = mkhash(lc $k);
+	my $h = $k =~ /^\w{1,8}$/s ? '_' . lc $k : mkhash(lc $k);
 	my $f;
 	return $s unless open $f, '>', "$HTML_DIR/$h.html";
 	html_escape($k, $s);
-	$s =~ s/\|/<LI>/sg;
+	$s =~ s/ \| /<LI>/sg;
 	$s =~ s/https?:\/\/[^ ,"<]+/<A href="$&">$&<\/A>/sig;
 	print $f <<HTMLTEXT;
 <HTML><HEAD><META http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -181,8 +181,8 @@ while (<STDIN>) {
 	} elsif ($cmd eq '!?') {
 		find($_) or print "Mis $_?\n"
 	} elsif ($modify{$cmd}) {
-		if (/^((?:[\w+ .#-]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
-		    /^((?:[\w+ .#-]|[^\x00-\x80])+?)\s+(\S.*)$/) {
+		if (/^((?:[\w+ .#'-]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
+		    /^((?:[\w+ .#'-]|[^\x00-\x80])+?)\s+(\S.*)$/) {
 			my $val;
 			if (my $def = $dict{lc $1}) {
 				(my $name, $val) = @{$def};

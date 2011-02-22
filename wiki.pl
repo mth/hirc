@@ -1,0 +1,10 @@
+$_=shift;
+tr/ /_/;
+die "$_? Ära ropenda!\n" if /[^\w()]/;
+exit 1 if !open(F, '-|') and exec "/usr/bin/host", "-t", "txt", "$_.wp.dg.cx";
+$_ = join(' ', <F>);
+close F;
+die "Mu pea pole prügikast\n" unless s/^.*descriptive text "//s and s/"$//;
+s/" "//gs;
+s/\\(.)/\1/gs;
+print $_;
