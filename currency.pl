@@ -47,7 +47,7 @@ if ($ARGV[0] =~ /^\s*(\d+(?:\.\d+)?)\s+(\w+)\s*$/) {
 } elsif ($ARGV[0] =~ /^\s*(\w+)\s*$/) {
 	$sum = undef;
 	$cur = $1;
-} else {
+} elsif ($ARGV[0] =~ /\S/) {
 	print "Mine arenema\n";
 	exit 0
 }
@@ -55,8 +55,13 @@ if ($ARGV[0] =~ /^\s*(\d+(?:\.\d+)?)\s+(\w+)\s*$/) {
 $cur = uc $cur;
 my %cur_data = &init;
 $cur_data{EEK} = 15.6466;
-my $rate = $cur_data{$cur};
 
+unless ($cur) {
+	print join(', ', sort grep {$_ ne 'date'} keys %cur_data) . "\n";
+	exit 0
+}
+
+my $rate = $cur_data{$cur};
 unless ($rate) {
 	print "Ah keri pekki\n";
 	exit 0
