@@ -211,7 +211,7 @@ while (<STDIN>) {
 		}
 	} elsif ($cmd eq '!new') {
 		print join(', ', @new), "\n" if @new;
-	} elsif ($cmd eq '!stat') {
+	} elsif ($cmd eq '!stat' or $cmd eq '!stats') {
 		my $count = keys %dict;
 		print "Baasis on $count definitsiooni.\n"
 	}
