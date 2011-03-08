@@ -64,7 +64,7 @@ utf8Encode (a:t) =
     Just s -> s ++ utf8Encode t
   where v = ord a
 
-latin9Exceptions = [(0xa4, "\xe2\x82"), -- euro
+latin9Exceptions = [(0xa4, "\xe2\x82\xac"), -- euro
                     (0xa6, "\xc5\xa0"), -- Sh
                     (0xa8, "\xc5\xa1"), -- sh
                     (0xb4, "\xc5\xbd"), -- Zh
