@@ -48,7 +48,7 @@ if ($ARGV[0] =~ /^\s*(\d+(?:\.\d+)?)\s+(\w+)\s*$/) {
 	$sum = undef;
 	$cur = $1;
 } else {
-	print "Mine arene\n";
+	print "Mine arenema\n";
 	exit 0
 }
 
