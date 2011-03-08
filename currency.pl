@@ -54,6 +54,7 @@ if ($ARGV[0] =~ /^\s*(\d+(?:\.\d+)?)\s+(\w+)\s*$/) {
 
 $cur = uc $cur;
 my %cur_data = &init;
+$cur_data{EEK} = 15.6466;
 my $rate = $cur_data{$cur};
 
 unless ($rate) {
@@ -62,7 +63,7 @@ unless ($rate) {
 }
 
 if ($sum) {
-	my $eur = sprintf "%.3f", $sum / $rate;
+	my $eur = sprintf "%.4f", $sum / $rate;
 	print "$sum $cur on $eur €\n"
 } else {
 	print "1 € on $rate $cur\n"
