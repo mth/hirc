@@ -1,4 +1,6 @@
-$SRC = 'http://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
+use strict;
+
+my $SRC = 'http://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
 
 sub parse {
 	return () unless open F, "<$_[0]";
@@ -17,8 +19,8 @@ sub parse {
 }
 
 sub init {
-	$DATA = 'eurofxref-daily.xml';
-	$DATA_TMP = "$DATA.tmp";
+	my $DATA = 'eurofxref-daily.xml';
+	my $DATA_TMP = "$DATA.tmp";
 
 	my ($sec, $min, $hour, $mday, $month, $year) = gmtime(time - 86400);
 	my $yesterday = sprintf "%04d-%02d-%02d", $year + 1900, $month + 1, $mday;
@@ -39,7 +41,8 @@ sub init {
 	%cur_data
 }
 
-my $sum, $cur;
+my $sum;
+my $cur;
 
 if ($ARGV[0] =~ /^\s*(\d+(?:\.\d+)?)\s+(\w+)\s*$/) {
 	$sum = $1;
