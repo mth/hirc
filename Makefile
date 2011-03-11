@@ -1,5 +1,5 @@
 # Use the following to install ghc with mtl and network libs on debian:
-# aptitude install ghc6 libghc6-mtl-dev libghc6-network-dev libghc6-http-dev libghc6-regex-compat-dev
+# aptitude install ghc6 libghc6-mtl-dev libghc6-network-dev libghc6-http-dev libghc6-regex-posix-dev
 
 HIRC = Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
 
