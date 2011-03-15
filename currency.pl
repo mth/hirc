@@ -72,7 +72,12 @@ unless ($rate) {
 
 if ($sum) {
 	my $eur = sprintf "%.4f", $sum / $rate;
-	print "$sum $cur on $eur €\n"
+	if ($cur eq 'EEK') {
+		print "$sum $cur on $eur €\n"
+	} else {
+		my $eek = sprintf "%.2f", $sum / $rate * 15.6466;
+		print "$sum $cur on $eur € ($eek kr)\n"
+	}
 } else {
 	print "1 € on $rate $cur\n"
 }
