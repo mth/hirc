@@ -150,22 +150,25 @@ connectIrc host port nick handler cfg =
         buf <- newChan
         cfgRef <- newIORef cfg
         nick' <- newIORef cnick
-        quit <- newIORef True
+        quit <- newIORef False
         let ctx = IrcCtx h lastPong sync buf cfgRef nick' quit
             writer t = do threadDelay t
                           msg <- readChan buf
                           runReaderT (ircSend C.empty "PRIVMSG" msg) ctx
                           writer (sum (120 : map C.length msg) * 9000)
-            ex (ErrorCall e) = fail e
-            ioEx e | ioeGetErrorString e == "QUIT" = return ()
+            ex (ErrorCall e) = do putStrLn ("ex: " ++ show e)
+                                  fail e
+            ioEx e | ioeGetErrorString e == "QUIT" = putStrLn "ioEx QUIT"
             ioEx e = do q <- readIORef quit
-                        if q then return () else ioError e
+                        if q then putStrLn "ioEx with quit"
+                             else putStrLn ("ioEx: " ++ show e) >> ioError e
         mainThread <- myThreadId
         threads <- sequence $ map forkIO [
             pinger ctx, pingChecker ctx mainThread, writer 1]
         finally (E.catch (Prelude.catch (runReaderT run ctx) ioEx) ex)
                 (finally (runReaderT (handler (C.empty, "TERMINATE", [])) ctx)
                          (mapM_ killThread threads >> hClose h))
+        putStrLn "Normal shutdown."
   where run = do user <- liftIO $ getEnv "USER"
                  ircCmd "NICK" cnick
                  ircSend C.empty "USER"
