@@ -261,17 +261,20 @@ seenMsg (Just channel) nick !said = updateUser update channel nick
                    Just (User {rank = r, spoke = said})
 seenMsg Nothing _ _ = return () -- private message
 
+emptyUser = Just (User { rank = 0, spoke = C.empty })
+
 -- XXX sharing seen.dat between channels is probably stupid, but whatever
 appendSeen :: [(C.ByteString, Bool)] -> C.ByteString -> Bot ()
 appendSeen nicks channel =
      do TOD t _ <- liftIO getClockTime
         mapM (format (show t)) nicks >>=
             liftIO . C.appendFile "seen.dat" . C.unlines
-  where clear alive u = if alive && rank u /= 0
-                            then return $! u {spoke = C.empty} else Nothing
+  where clear True (Just u) | rank u /= 0 = Just $ u {spoke = C.empty}
+        clear True _ = emptyUser -- QUIT needs it
+        clear _ _ = Nothing
         format t (nick, alive) =
          do user <- getUser channel nick
-            updateUser (>>= clear alive) channel nick
+            updateUser (clear alive) channel nick
             let said = maybe C.empty spoke user
             return $! C.concat
                 [nick, C.pack ('\t':(if alive then '+':t else t)), tab, said]
