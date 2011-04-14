@@ -253,7 +253,7 @@ updateRank :: (Int -> Int) -> C.ByteString -> C.ByteString -> Bot ()
 updateRank f channel nick = updateUser update channel nick
   where update u = let !r = f (maybe 0 rank u)
                        !s = maybe C.empty spoke u in
-                   if r == 0 && C.null s then Nothing
+                   if r == 0 && C.null s then emptyUser
                                          else Just (User {rank = r, spoke = s})
 
 seenMsg (Just channel) nick !said = updateUser update channel nick
