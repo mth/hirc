@@ -1,17 +1,7 @@
 use Encode;
-use LWP;
-
-$user_agent = LWP::UserAgent->new;
-$user_agent->agent('Lynx/2.8.6rel.4 libwww-FM/2.14');
 
 sub http {
-	my ($timeout, $url) = @_;
-	my $req = HTTP::Request->new(GET => $url);
-	$user_agent->timeout($timeout);
-	my $res = $user_agent->request($req);
-	if ($res->is_success) {
-		return $res->content
-	}
+	`curl -sf --connect-timeout '$_[0]' '$_[1]'`
 }
 
 $last_update = 0;
