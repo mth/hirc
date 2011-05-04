@@ -504,7 +504,8 @@ getConfig users =
         permPattern "" = ""
 
 main = 
-     do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
+     do setCLocale
+        installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
         users <- H.new (==) hashByteString
         getConfig users >>= connect 0
   where connect nth config =

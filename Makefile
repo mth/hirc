@@ -3,8 +3,8 @@
 
 HIRC = Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
 
-hirc: $(HIRC)
-	ghc -o $@ -W -O2 -XBangPatterns --make $+
+hirc: $(HIRC) clocale.o
+	ghc -o $@ -W -O2 -XBangPatterns -XForeignFunctionInterface --make $+
 	strip $@
 
 hirc-prof: $(HIRC)

@@ -17,10 +17,12 @@
  - You should have received a copy of the GNU General Public License
  - along with HircBot.  If not, see <http://www.gnu.org/licenses/>.
  -}
-module Utf8Conv (utf8Decode, utf8Encode) where
+module Utf8Conv (utf8Decode, utf8Encode, setCLocale) where
 
 import Data.Bits
 import Data.Char
+
+foreign import ccall "setclocale" setCLocale :: IO ()
 
 infixl 7 &
 (&) :: Char -> Int -> Int
