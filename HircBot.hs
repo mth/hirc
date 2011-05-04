@@ -194,8 +194,10 @@ sysProcess input prog argv =
                                closeFd stdInput
             closeFd wd
             mapM_ (tryClose . toEnum) [3 .. 255]
-            executeFile prog False argv Nothing
-            fdWrite stdError "dead plugin walking"
+            catch (executeFile prog False argv Nothing)
+                  (\e -> when (input /= Nothing)
+                              (fdWrite stdError (show e ++ "\n") >> return ()))
+            fdWrite stdOutput "dead plugin walking"
             exitImmediately (ExitFailure 127)
 
 readInput :: (Maybe Int) -> Handle -> (C.ByteString -> IO ()) -> IO () -> IO ()
