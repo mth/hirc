@@ -69,6 +69,24 @@ HTMLTEXT
 	"$HTML_URL/$h.html"
 }
 
+sub show_query {
+	my ($def, $at) = @_;
+
+	my %cycle;
+	my ($key, $val) = @{$def};
+	while (not defined $cycle{$key} and
+	       $val =~ /^\?\??\s+(.*?)\s*$/ and ($def = $dict{lc $1})) {
+		($key, $val) = @{$def};
+		$cycle{$key} = 1;
+	}
+	if ($at) {
+		my @parts = split(/\s+\|\s+/, $val);
+		$val = $parts[$at - 1];
+	}
+	$val = get_long_text($key, $val);
+	print "$key - $val\n";
+}
+
 sub def_key {
 	my ($msg, $name, $val, $loser, $old, $fix) = @_;
 	$name =~ tr/\t\n/  /;
@@ -120,7 +138,11 @@ sub find {
 	}
 	my @r = sort {$rr{$b} <=> $rr{$a}} (keys %rr);
 	@r = @r[0..29] if @r > 30;
-	print "? " . join(", ", @r), "\n" if @r;
+	if ($_[1] and !$#r) {
+		show_query($dict{lc $r[0]})
+	} else {
+		print "? " . join(", ", @r), "\n" if @r
+	}
 	@r
 }
 
@@ -162,20 +184,8 @@ while (<STDIN>) {
 		my $at;
 		$at = $1 if s/ +\[(\d+)\]//s;
 		if (my $def = $dict{lc $_}) {
-			my %cycle;
-			my ($key, $val) = @{$def};
-			while (not defined $cycle{$key} and
-			       $val =~ /^\?\??\s+(.*?)\s*$/ and ($def = $dict{lc $1})) {
-				($key, $val) = @{$def};
-				$cycle{$key} = 1;
-			}
-			if ($at) {
-				my @parts = split(/\s+\|\s+/, $val);
-				$val = $parts[$at - 1];
-			}
-			$val = get_long_text($key, $val);
-			print "$key - $val\n";
-		} elsif (!$at and !find($_)) {
+			show_query($def, $at)
+		} elsif (!$at and !find($_, 1)) {
 			print "$_ ei eksisteeri\n"
 		}
 	} elsif ($cmd eq '!?') {
