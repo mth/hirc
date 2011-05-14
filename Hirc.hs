@@ -19,7 +19,8 @@
  -}
 module Hirc (
     Irc, showMsg, ircSend, ircCmd, say, quitIrc, connectIrc,
-    escape, ircCatch, liftIO, ircConfig, ircSetConfig, myIrcNick, splitN
+    escape, ircCatch, liftIO, ircConfig, ircSetConfig, myIrcNick, splitN,
+    initEnv
 ) where
 
 import Control.Arrow
@@ -42,6 +43,8 @@ data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          currentNick :: IORef C.ByteString,
                          isQuit :: IORef Bool }
 type Irc c a = ReaderT (IrcCtx c) IO a
+
+foreign import ccall "hirc_init_env" initEnv :: IO ()
 
 space = C.singleton ' '
 colon = C.singleton ':'

@@ -504,7 +504,7 @@ getConfig users =
         permPattern "" = ""
 
 main = 
-     do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
+     do initEnv
         hSetBuffering stdout LineBuffering
         users <- H.new (==) hashByteString
         getConfig users >>= connect 0
