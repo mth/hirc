@@ -505,6 +505,7 @@ getConfig users =
 
 main = 
      do installHandler sigPIPE Ignore Nothing -- stupid ghc runtime
+        hSetBuffering stdout LineBuffering
         users <- H.new (==) hashByteString
         getConfig users >>= connect 0
   where connect nth config =
