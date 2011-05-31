@@ -49,7 +49,7 @@ data EventSpec =
     Send String [C.ByteString] |
     Say C.ByteString | SayTo C.ByteString C.ByteString |
     Join C.ByteString | Quit C.ByteString | Perm String |
-    HasPerm String [EventSpec] | RandLine String |
+    IfPerm String [EventSpec] [EventSpec] | RandLine String |
     Exec String [C.ByteString] | Plugin [String] C.ByteString |
     Http C.ByteString C.ByteString Int Regex [EventSpec] |
     Calc C.ByteString | Append String C.ByteString | Rehash
@@ -443,9 +443,9 @@ bot' msg@(prefix, cmd, args) =
             SayTo to text -> mapM_ (say $ param to) (C.lines $ param text)
             Perm perm     -> do ok <- checkPerm channel from prefix perm
                                 unless ok (fail "NOPERM")
-            HasPerm perm events ->
+            IfPerm perm events evElse->
                  do ok <- checkPerm channel from prefix perm
-                    when ok (mapM_ (execute param) events)
+                    mapM_ (execute param) (if ok then events else evElse)
             Join channel  -> ircSend C.empty "JOIN" [param channel]
             Quit msg      -> quitIrc (param msg)
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
