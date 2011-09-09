@@ -202,16 +202,18 @@ sysProcess input prog argv =
             fdWrite stdOutput "dead plugin walking"
             exitImmediately (ExitFailure 127)
 
-readInput :: (Maybe Int) -> Handle -> (C.ByteString -> IO ()) -> IO () -> IO ()
-readInput limit h f cleanup = catch (copy limit) (\_ -> hClose h >> cleanup)
-  where copy (Just limit) | limit <= 0 = f (C.pack "...")
-        copy limit = C.hGetLine h >>= f >> copy (fmap (+ (-1)) limit)
+readInput :: Handle -> (C.ByteString -> IO Bool) -> IO () -> IO ()
+readInput h f cleanup = catch copy (\_ -> hClose h >> cleanup)
+    where copy = C.hGetLine h >>= f >>= (`when` copy)
 
 execSys :: C.ByteString -> Int -> String -> [C.ByteString] -> Bot ()
 execSys to maxLines prog argv =
      do sayTo <- fmap (. say to) escape
         liftIO $ do (pid, h) <- sysProcess Nothing prog (map C.unpack argv)
-                    forkIO $ readInput (Just maxLines) h sayTo (return ())
+                    v <- newMVar maxLines
+                    let sayN s =
+                         modifyMVar v (\n -> sayTo s >> return (n - 1, n > 1))
+                    forkIO $ readInput h sayN (return ())
                     forkIO $ guard sayTo pid
                     return ()
   where kill sig pid next =
@@ -360,8 +362,8 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                 hSetEncoding h latin1
                 hSetBuffering h LineBuffering
                 return (pid, h, fd)
-        let sayTo s = readMVar to >>= unlift . (`say` s)
-            output = readInput Nothing out sayTo $
+        let sayTo s = readMVar to >>= unlift . (`say` s) >> return True
+            output = readInput out sayTo $
                          do unlift (removePlugin id)
                             hClose inp
                             getProcessStatus True False pid
