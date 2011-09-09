@@ -48,8 +48,9 @@ data EncodingSpec = Utf8 | Latin1 | Raw
 data EventSpec =
     Send String [C.ByteString] |
     Say C.ByteString | SayTo C.ByteString C.ByteString |
-    Join C.ByteString | Quit C.ByteString | Perm String | RandLine String |
-    Exec String [C.ByteString] | ExecMaxLines Int String [C.ByteString] |
+    Join C.ByteString | Quit C.ByteString | Perm String |
+    IfPerm String [EventSpec] [EventSpec] | RandLine String |
+    Exec String [C.ByteString] | ExecMaxLines Int String |
     Plugin [String] C.ByteString |
     Http C.ByteString C.ByteString Int Regex [EventSpec] |
     Calc C.ByteString | Append String C.ByteString | Rehash
@@ -388,8 +389,9 @@ invokePlugin id to msg =
 {-
  - CORE
  -}
-requirePerm :: Maybe C.ByteString -> C.ByteString -> C.ByteString -> String -> Bot ()
-requirePerm channel nick prefix perm =
+checkPerm :: Maybe C.ByteString -> C.ByteString -> C.ByteString
+             -> String -> Bot Bool
+checkPerm channel nick prefix perm =
      do cfg <- ircConfig
         let hasPerm "+" = hasRank 1
             hasPerm "%" = hasRank 2
@@ -410,8 +412,7 @@ requirePerm channel nick prefix perm =
                                 (getUserMap nick)
                 Just ch -> fmap (maybe False ((>= expectRank) . rank))
                                 (getUser ch nick)
-        ok <- hasPerm perm
-        unless ok (fail "NOPERM")
+        hasPerm perm
 
 -- wrapper that encodes irc input into desired charset
 bot :: (C.ByteString, String, [C.ByteString]) -> Bot ()
@@ -441,7 +442,11 @@ bot' msg@(prefix, cmd, args) =
             Send evCmd evArg -> ircSend C.empty evCmd (map param evArg)
             Say text      -> mapM_ reply (C.lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (C.lines $ param text)
-            Perm perm     -> requirePerm channel from prefix perm
+            Perm perm     -> do ok <- checkPerm channel from prefix perm
+                                unless ok (fail "NOPERM")
+            IfPerm perm events evElse->
+                 do ok <- checkPerm channel from prefix perm
+                    mapM_ (execute param) (if ok then events else evElse)
             Join channel  -> ircSend C.empty "JOIN" [param channel]
             Quit msg      -> quitIrc (param msg)
             RandLine fn   -> liftIO (randLine fn) >>= reply . param
