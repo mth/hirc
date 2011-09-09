@@ -49,7 +49,8 @@ data EventSpec =
     Send String [C.ByteString] |
     Say C.ByteString | SayTo C.ByteString C.ByteString |
     Join C.ByteString | Quit C.ByteString | Perm String | RandLine String |
-    Exec String [C.ByteString] | Plugin [String] C.ByteString |
+    Exec String [C.ByteString] | ExecMaxLines Int String [C.ByteString] |
+    Plugin [String] C.ByteString |
     Http C.ByteString C.ByteString Int Regex [EventSpec] |
     Calc C.ByteString | Append String C.ByteString | Rehash
     deriving Read
@@ -205,11 +206,11 @@ readInput limit h f cleanup = catch (copy limit) (\_ -> hClose h >> cleanup)
   where copy (Just limit) | limit <= 0 = f (C.pack "...")
         copy limit = C.hGetLine h >>= f >> copy (fmap (+ (-1)) limit)
 
-execSys :: C.ByteString -> String -> [C.ByteString] -> Bot ()
-execSys to prog argv =
+execSys :: C.ByteString -> Int -> String -> [C.ByteString] -> Bot ()
+execSys to maxLines prog argv =
      do sayTo <- fmap (. say to) escape
         liftIO $ do (pid, h) <- sysProcess Nothing prog (map C.unpack argv)
-                    forkIO $ readInput (Just 50) h sayTo (return ())
+                    forkIO $ readInput (Just maxLines) h sayTo (return ())
                     forkIO $ guard sayTo pid
                     return ()
   where kill sig pid next =
@@ -449,7 +450,9 @@ bot' msg@(prefix, cmd, args) =
                 ircCatch (reply' $ calc $ C.unpack $ param text) reply'
             Rehash        -> killPlugins >>
                 ircConfig >>= liftIO . getConfig . users >>= ircSetConfig
-            Exec prg args -> execSys replyTo prg (map param args)
+            Exec prg args -> execSys replyTo 50 prg (map param args)
+            ExecMaxLines limit prg args ->
+                execSys replyTo limit prg (map param args)
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
                 httpGet (C.unpack $ param uri) (C.unpack $ param body) maxb
