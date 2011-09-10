@@ -208,13 +208,15 @@ readInput h f cleanup = catch copy (\_ -> hClose h >> cleanup)
 
 execSys :: C.ByteString -> Int -> String -> [C.ByteString] -> Bot ()
 execSys to maxLines prog argv =
-     do sayTo <- fmap (. say to) escape
+     do unlift <- escape
+        let filter l n = let l' = take n l in return (n - length l', l)
         liftIO $ do (pid, h) <- sysProcess Nothing prog (map C.unpack argv)
                     v <- newMVar maxLines
-                    let sayN s =
-                         modifyMVar v (\n -> sayTo s >> return (n - 1, n > 1))
+                    let sayN s = do
+                         unlift $ say' (liftIO . modifyMVar v . filter) to s
+                         withMVar v (return . (> 0))
                     forkIO $ readInput h sayN (return ())
-                    forkIO $ guard sayTo pid
+                    forkIO $ guard (unlift . say to) pid
                     return ()
   where kill sig pid next =
          do dead <- getProcessStatus False False pid

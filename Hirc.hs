@@ -18,7 +18,7 @@
  - along with HircBot.  If not, see <http://www.gnu.org/licenses/>.
  -}
 module Hirc (
-    Irc, showMsg, ircSend, ircCmd, say, quitIrc, connectIrc,
+    Irc, showMsg, ircSend, ircCmd, say, say', quitIrc, connectIrc,
     escape, ircCatch, liftIO, ircConfig, ircSetConfig, myIrcNick, splitN,
     initEnv
 ) where
@@ -100,8 +100,10 @@ smartSplit at s =
 
 splitN n = takeWhile (not . C.null) . unfoldr (Just . smartSplit n)
 
-say !to text = mapM_ msg $! splitN 400 text
+say' limit !to text = limit (splitN 400 text) >>= mapM_ msg
   where msg !line = ask >>= liftIO . (`writeChan` [to, line]) . buffer
+
+say to text = say' return to text
 
 quitIrc :: C.ByteString -> Irc c ()
 quitIrc quitMsg =
