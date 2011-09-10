@@ -209,7 +209,7 @@ readInput h f cleanup = catch copy (\_ -> hClose h >> cleanup)
 execSys :: C.ByteString -> Int -> String -> [C.ByteString] -> Bot ()
 execSys to maxLines prog argv =
      do unlift <- escape
-        let filter l n = let l' = take n l in return (n - length l', l)
+        let filter l n = let r = take n l in return (n - length r, r)
         liftIO $ do (pid, h) <- sysProcess Nothing prog (map C.unpack argv)
                     v <- newMVar maxLines
                     let sayN s = do
