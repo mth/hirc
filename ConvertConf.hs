@@ -82,8 +82,7 @@ data ConfigItem =
     Permit String Strings |
     NoPermit EventSpecs deriving Show
 
-notComment s = let s' = C.dropWhile isSpace s in
-               C.null s' || C.head s' /= '#'
+notComment s = let s' = C.dropWhile isSpace s in C.null s' || C.head s' /= '#'
 rmComments = C.unlines . filter notComment . C.lines
 put x = putStrLn (show x ++ ",")
 

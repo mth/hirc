@@ -3,6 +3,8 @@
 
 HIRC = Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
 
+all: hirc acrogrep history convert-conf
+
 hirc: $(HIRC) initenv.o
 	ghc -o $@ -W -O2 -XBangPatterns -XForeignFunctionInterface --make $+
 	strip $@
@@ -22,9 +24,6 @@ calc: Calculator.hs CalcTest.hs
 
 convert-conf: ConvertConf.hs
 	ghc -o $@ -W -O2 --make $+
-	strip $@
-
-all: hirc acrogrep history
 
 acrogrep: acrogrep.c
 	cc -o $@ -W -O2 $+
