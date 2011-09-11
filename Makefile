@@ -32,4 +32,4 @@ history: history.c
 	cc -o $@ -W -O2 $+
 
 clean:
-	rm -f hirc *.hi *.o acrogrep history
+	rm -f hirc *.hi *.o acrogrep history convert-conf
