@@ -450,7 +450,8 @@ bot' msg@(prefix, cmd, args) =
             Say text      -> mapM_ reply (C.lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (C.lines $ param text)
             Call alias args ->
-                let exec = execute (bindArg prefix (from:map param args)) in
+                let exec = execute (if null args then param else
+                                        bindArg prefix (from:map param args)) in
                 ircConfig >>= liftIO . (`H.lookup` alias) . aliasMap >>=
                 maybe (error (C.unpack alias ++ " undefined")) (mapM_ exec)
             Perm perm     -> do ok <- checkPerm channel from prefix perm
