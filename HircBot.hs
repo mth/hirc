@@ -53,7 +53,8 @@ data EventSpec =
     Exec String [C.ByteString] | Plugin [String] C.ByteString |
     ExecMaxLines Int String [C.ByteString] |
     Http C.ByteString C.ByteString Int Regex [EventSpec] |
-    Calc C.ByteString | Append String C.ByteString | Rehash
+    Calc C.ByteString | Append String C.ByteString | Rehash |
+    Call C.ByteString [C.ByteString]
     deriving Read
 
 data AllowSpec = Client Regex | Group String
@@ -77,6 +78,7 @@ data Config = Config {
     servers  :: [(String, Integer)],
     nick     :: String,
     encoding :: EncodingSpec,
+    aliases  :: [(C.ByteString, [EventSpec])],
     messages :: [(Regex, [EventSpec])],
     commands :: [(String, [Regex], [EventSpec])],
     permits  :: [(String, [String])],
@@ -100,6 +102,7 @@ data ConfigSt = ConfigSt {
     raw :: Config,
     encodeInput :: String -> String,
     patterns :: ConfigPatterns,
+    aliasMap :: H.HashTable C.ByteString [EventSpec],
     perms :: M.Map String [AllowSpec],
     -- Map nick (Map channel User)
     users :: H.HashTable C.ByteString (M.Map C.ByteString User),
@@ -446,9 +449,13 @@ bot' msg@(prefix, cmd, args) =
             Send evCmd evArg -> ircSend C.empty evCmd (map param evArg)
             Say text      -> mapM_ reply (C.lines $ param text)
             SayTo to text -> mapM_ (say $ param to) (C.lines $ param text)
+            Call alias args ->
+                let exec = execute (bindArg prefix (from:map param args)) in
+                ircConfig >>= liftIO . (`H.lookup` alias) . aliasMap >>=
+                maybe (error (C.unpack alias ++ " undefined")) (mapM_ exec)
             Perm perm     -> do ok <- checkPerm channel from prefix perm
                                 unless ok (fail "NOPERM")
-            IfPerm perm events evElse->
+            IfPerm perm events evElse ->
                  do ok <- checkPerm channel from prefix perm
                     mapM_ (execute param) (if ok then events else evElse)
             Join channel  -> ircSend C.empty "JOIN" [param channel]
@@ -491,6 +498,8 @@ getConfig users =
      do args <- getArgs
         s <- C.readFile (fromMaybe "hircrc" $ listToMaybe args)
         let !cfg = read $ C.unpack $! rmComments s
+        aliasHash <- H.new (==) hashByteString
+        mapM_ (\(k, v) -> H.update aliasHash k v) (aliases cfg)
         return $! ConfigSt {
             raw = cfg,
             encodeInput = case encoding cfg of
@@ -498,6 +507,7 @@ getConfig users =
                           Latin1 -> utf8Decode
                           Raw -> id,
             patterns = createPatterns cfg,
+            aliasMap = aliasHash,
             perms = foldr addPerm M.empty (permits cfg),
             plugins = M.empty,
             users = users
