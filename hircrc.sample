@@ -2,6 +2,7 @@ Config {
 	servers = [("irc.datanet.ee", 6667)],
 	nick = "Hircb0t",
 	encoding = Utf8,
+	aliases = [],
 	messages = [
 		(/^!quit$/, [Perm "root", Quit "Returning to hell..."]),
 		(/^!reload$/, [Perm "root", Rehash, Say "Matrix ok."]),
