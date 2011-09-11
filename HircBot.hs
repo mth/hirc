@@ -78,7 +78,7 @@ data Config = Config {
     servers  :: [(String, Integer)],
     nick     :: String,
     encoding :: EncodingSpec,
-    aliases  :: [(C.ByteString, [EventSpec])],
+    define   :: [(C.ByteString, [EventSpec])],
     messages :: [(Regex, [EventSpec])],
     commands :: [(String, [Regex], [EventSpec])],
     permits  :: [(String, [String])],
@@ -500,7 +500,7 @@ getConfig users =
         s <- C.readFile (fromMaybe "hircrc" $ listToMaybe args)
         let !cfg = read $ C.unpack $! rmComments s
         aliasHash <- H.new (==) hashByteString
-        mapM_ (\(k, v) -> H.update aliasHash k v) (aliases cfg)
+        mapM_ (\(k, v) -> H.update aliasHash k v) (define cfg)
         return $! ConfigSt {
             raw = cfg,
             encodeInput = case encoding cfg of
