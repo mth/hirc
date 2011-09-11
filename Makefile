@@ -20,6 +20,10 @@ calc: Calculator.hs CalcTest.hs
 	ghc -o $@ -W -O2 --make $+
 	strip $@
 
+convert-conf: ConvertConf.hs
+	ghc -o $@ -W -O2 --make $+
+	strip $@
+
 all: hirc acrogrep history
 
 acrogrep: acrogrep.c
