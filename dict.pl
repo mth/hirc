@@ -131,7 +131,7 @@ sub find {
 			} elsif ($k =~ /\Q$s\E/sg) {
 				$c = 2
 			}
-			$c += 4 if $val =~ /(?:^|[^\w.?\/&=])\Q$s\E(?:[^\w?\/&=]|$)/is;
+			$c += 4 if $val =~ /(?:^|[^\w.?\/&=])\Q$s\E(?:[^>\w?\/&=]|$)/is;
 			++$c while $val =~ /\Q$s\E/sig;
 			$rr{$name} = $c;
 		}
@@ -191,8 +191,8 @@ while (<STDIN>) {
 	} elsif ($cmd eq '!?') {
 		find($_) or print "Mis $_?\n"
 	} elsif ($modify{$cmd}) {
-		if (/^((?:[\w+ .#'-]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
-		    /^((?:[\w+ .#'-]|[^\x00-\x80])+?)\s+(\S.*)$/) {
+		if (/^((?:[\w+ .#'&-]|[^\x00-\x80])+?)\s*=\s*(\S.*)$/ or
+		    /^((?:[\w+ .#'&-]|[^\x00-\x80])+?)\s+(\S.*)$/) {
 			my $val;
 			if (my $def = $dict{lc $1}) {
 				(my $name, $val) = @{$def};
