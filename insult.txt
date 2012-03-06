@@ -23,13 +23,14 @@ $1: oled sa alati nii loll või on sul lihtsalt blond hetk??
 K: Mida ütles jumal, kui ta $1' tegi? V: Oh shit!
 K: Kui Empire State Building'u katuselt kukuvad alla paks neeger ja $1, siis kumb jõuab alla esimesena? V: Pole valge mehe asi.
 K: Mis on $1' jaoks pikk ja raske? V: Algkool
-$1: sa pole just karbi kõige kirkam kriit
+$1 pole just karbi kõige kirkam kriit
 $1: sa oled erakordselt sita väljanägemisega. On see mingi uus trend?
 $1: kumb meist nüüd mürki peaks võtma?
 $1: mõni küla on sinu pärast praegu ilma lollita.
 $1: on see kitsehabe või on tuvid su lõua täis sittunud?
 $1: palun seisa allatuult.
 $1: sae pekki.
+$1: Ah keri pekki
 Kuule $1, sina kõdunenud kammeljas, sina mädanenud mudakukk, sina solgitud särg, mine osta omale õng.
 $1: näri muru!
 $1: kes sinusugusele kulendile suu andis?
@@ -38,19 +39,18 @@ $1: söö sitta! (miljardid kärbsed ei saa ju ometi valel teel olla)
 $1: sa näed välja nagu keedetud kaheksajalg
 $1: sa oled meditsiiniline ime
 $1: sa näed ikka vahva välja! See kleit su seljas on pilapoest, eks?
-$1: milline seitsmest pöialpoisist Sina oled?
 $1: kao eemale! Sa seisad mu aura peal!
 $1 on mees, kes ei tee palju sõnu. Aga möliseb ikkagi rohkem kui vaja.
 . o O ( Kus on geenipolitsei? Siin on mingi jälk $1 ) O o .
 . o O ( Millise kivi alt küll sellised lontrused nagu $1 välja ronivad.. ) O o .
 $1: kes ma Sinu arust olen? Kärbsepaber idiootidele?
 $1: on Sul minut aega? Räägi mulle ära kõik, mida Sa üldse tead.
-$1: sa oled nii loll, et sobiksid ideaalselt Võrno saatesse.
+$1 on nii loll, et sobiks ideaalselt Võrno saatesse
 $1: Su jutt kõlab nagu eesti keel, aga ma ei saa mitte halligi aru.
 $1: kõik mu eelarvamused Sinu suhtes on ajapikku tõeks osutunud.
 $1: ilmselgelt on ainuke lahendus sinu probleemile suitsiid.
 $1: see et keegi sind ei mõista, ei tähenda veel et oled kunstnik.
-$1: Sa varud ilmselt alati spetsiaalselt aega, et end avalikus kohas lolliks teha.
+$1{: Sa varud| varub} ilmselt alati spetsiaalselt aega, et end avalikus kohas lolliks teha.
 $1: Kuuldavasti oli sul kunagi yks mõte, aga see suri yksinduse kätte ära.
 $1: Ma vihkan kõiki. Sina oled järgmine.
 $1: Ja sinu täiesti mõttetu arvamus on...?
@@ -99,17 +99,16 @@ $1, naerata{, kummarda|} ja ütle: "Jah, mu käskija."
 $1, kas ma mainisin, et kui sa {mind puudutad|minuga räägid}, saad kohe jalaga munadesse?
 $1, sa näed erakordselt sitt välja. On see mingi uus trend?
 $1, kumb meist nüüd rohtu peaks võtma?
-$1: Kuidas seda laserkaardikeppi tapare¸iimile lülitatakse?
+$1: Kuidas seda laserkaardikeppi taparežiimile lülitatakse?
 Ja milline seitsmest pöialpoisist sina, $1, oled?
 $1: Ma sorisin küll kaltsupoes, aga seda hilpu ma seal küll ei näinud
-Kus on geenipolitsei? Siin on mingi mutant.
+Kus on geenipolitsei? Siin on mingi mutant, kes kasutab nime $1.
 $1, küll sa näed ikka vahva välja. See kleit on sul pilapoest, eks?
 $1, muidugi on ka meestel tunded. Aga keda see kotib?
 Ilus kleit, $1. Loodad alla võtta, et sellesse ära mahtuda?
 Parem ära mind vihasta $1. Mul hakkavad kirstud otsa saama
 Oi, kui kena raseda kleit $1. Sa polegi? Nojah ...
 Ma ei usu imesid, $1. Ma arvestan nendega
-$1, sul on nii inetu nägu, et see trükiti lennukite oksekottidele.
 $1, räägi siis ometi! Sul on õigus oma lollile arvamusele.
 Ma vihkan kõiki. Sina, $1, oled järgmine.
 $1, Ja sinu täiesti mõttetu arvamus on...?
@@ -135,8 +134,7 @@ $1, jah, see on noku moodi küll, aga palju väiksem.
 Sina, $1, oled vist palju Bushi kõnesid kuulanud?
 $1: Mulle meeldib su lähenemine.  Nüüd näita, kuidas sa kaugened.
 Sul, $1, käis üks mõte peast läbi?  See pidi vast pikk ja üksildane teekond olema.
-Kuule, $1, mine õige {Meerika Ase-Resi-Tondiga|Ameerika
-asepresidendiga} pardijahile.
+Kuule, $1, mine õige {Meerika Ase-Resi-Tondiga|Ameerika asepresidendiga} pardijahile.
 kas su vanemad tõesti vihkasid sind niipalju et $1 sulle nimeks panid või astusid enesevihkajate klubisse ja võtsid omale sellise nime ?:)
 nimesid nimetamata aga $1 on ikka paras ajukääbik küll
 Sa meeldid mulle $1. Inimesed küll ütlevad, et mul ei ole maitset, aga sa meeldid mulle.
@@ -149,8 +147,9 @@ $1: Hoiatus: mul on oma arvamus ja ma tean, kuidas seda kasutada.
 $1: Huvitav, miks tulnukad sulle pärakusse sondi jätsid?
 $1: Ideaalne aeg hakata kadunud inimeseks.
 $1: Ilus kleit. Loodad alla võtta, et sellesse ära mahtuda?
+$1: Ilus raseda kleit, sünnitad sa varsti?
 $1: ime kanni!
-$1: Inetusvõistlusel oleks sulle vääriliseks vastaseks ainlt üleeilne okseloik. ise oled
+$1: Inetusvõistlusel oleks sulle vääriliseks vastaseks ainlt üleeilne okseloik.
 $1: Jah, see on noku moodi küll, aga palju väiksem.
 $1: Ja milline seitsmest pöialpoisist sina oled?
 $1: ja mina mõtlesin maailma koledaim inimene küll siia ei juhtu...
@@ -162,7 +161,7 @@ $1: Kas su koduplaneedil keegi kunagi vait ka on?
 $1: Kas sulle tundub, et ma vajan seltskonda?
 $1: kui aju oleks vihm, siis sina oleks kõrb.
 $1: Kuidas ma saangi sinust puudust tunda, kui sa {kuidagi|kunagi} ära ei lähe?
-$1: Kuidas seda laserkaardikeppi tapare¸iimile lülitatakse
+$1: Kuidas seda laserkaardikeppi taparežiimile lülitatakse
 $1: Kui inimest toiduga võrrelda, siis sina oled odav, maitsetu ja saad kiiresti valmis.
 $1: kui ma luban, et igatsen su järele, kas sa siis läheksid ära?
 $1: kui ma peaks tapma kõik kes sind vihkavad, siis see ei oleks mõrv...   ...see oleks genotsiid.
@@ -186,12 +185,11 @@ $1: mängime hobust. Mina olen esimene pool ja sina {oled sina ise|võid lihtsal
 $1: ma tõesti ei arva, et sa oled loll, aga mis minu arvamus loeb tuhandete teiste vastu.
 $1: ma tuleks meelsasti sinuga kohtama, aga mu lemmik reklaam on praegu telekas.
 $1: milline darwini auhind sulle kuulus ?
-$1: muidugi on ka sinul tunded. Aga keda see kotib?
+$1, muidugi on ka sinul tunded. Aga keda see kotib?
 $1: mul on kiire praegu, võin ma sind mõni teine kord ignoreerida?
 $1: Naerata ja ütle: "Jah, mu käskija."
 $1: Näri leiba!
 $1: nii-nii. Jälle on tsirkusest paar klouni putku pannud.
-$1: Oi, kui kena raseda kleit. Sa polegi... Nojah
 $1: oled sa alati nii loll või pingutad täna eriti selle nimel?
 $1: oled sa TONT või Inimene ?
 $1: on need sinu silmamunad, mis ma oma dekolteest leidsin?
@@ -202,7 +200,8 @@ $1: sa ei saa iialgi nii vanaks kui välja näed.
 $1: sa ei tea sõna "hirm" tähendust. Aga kui järele mõelda, siis sa ei tea enamuse sõnade tähendust.
 $1: sa oled loll kui leivaauto.
 $1: sa oled nii kole, et kui ma su loomaaeda viisin, siis talitaja ütles: "Tänan, et ta tagasi tõite."
-$1: sa oled nii kole, et su pilt trükiti lennukite oksekottidele.
+$1, sul on nii inetu nägu, et see trükiti {lennukite|Ryanair} oksekottidele.
+$1: sa oled nii kole, et su pilt trükiti {lennukite|Ryanair} oksekottidele.
 $1: sa oled täpselt nagu Action Man: Kandiline soeng, armiline nägu ja püksis mitte midagi.
 $1: sa tõendad seda, et isegi jumal eksib vahest.
 $1: see, kui keegi sind ei mõista, ei tähenda veel, et sa oled kunstnik,
@@ -211,7 +210,6 @@ $1: Sinuga dringile? Pigem teen endale ise tuimestuseta pimesooleoperatsiooni.
 $1: sinu lolliks nimetamine on solvang kõigile teistele lollidele.
 $1: sinu nõuannet ma küll ei vaja. Sa ei oska ju kahekümne ühenigi lugeda, kui sa alasti pole.
 $1, Sul on nii ilusad kõverad jalad
-$1: Tal on nii inetu nägu, et see trükiti lennukite oksekottidele
 $1: tavaliselt inimesed elavad ja õpivad. Sina ainult elad.
 $1: tunne end nagu kodus. Korista mu köök ja WC ära.
 $1: üldiselt ma ei taha küll kellegi kohta sitasti öelda aga sina oled ikka tõsiselt räige
@@ -228,7 +226,7 @@ $1 puhul on igasuguste teotuste väljamõtlemine mõttetu
 $1, häda on tulnud maale koos sinuga!
 $1: Kas sulle tundub, et ma vajan seltskonda?
 Võrreldes $1 õudusega on Cthulhu nagu pehme kiisupoeg
-Mis kuradi käkk see $1 sihuke on?
+Mis kuradi käkk see $1 {sihuke|selline} on?
 $1 meeldib mulle. Inimesed ütlevad, et mul puudub igasugune maitse, aga mulle ta meeldib.
 rattaletõmbamise võiks asendada $1 kasutamisega
 mullast on $1 tulnud ja mullaks peab ta ka saama
@@ -238,7 +236,7 @@ peaga vastu seina peksmine on meeldivam kui $1
 $1 kui ohtlik psühholoogiline relv tuleks Genfi konventsiooniga keelustada
 $1: oled sa alati nii loll või on sul lihtsalt blond hetk?
 $1 on nagu heroiin: korra proovid, igaveseks jama kaelas
-$1: siin on sulle Statoili kinkepakk, tarvita julgelt
+$1, siin on sulle Statoili kinkepakk, tarvita julgelt
 $1: kas sa oled alati nii loll või on täna mingi eriolukord?
 ma ei tea, mis $1 nii lolliks teeb, aga igatahes see mõjub
 $1: mitu korda ma pean vett tõmbama, et sa ära kaoksid?
@@ -256,7 +254,7 @@ $1: ma ei mäleta su nime, luba ma kutsun sind perseussiks?
 miks $1 mütsi perse peal kannab?
 $1 on nii kole, et isegi kärbestel läheb süda pahaks
 $1 on jälle eksinud nagu sõrm seedekulglasse
-$1 ei saa kunagi nii kõvaks meheks kui ta ema on
+$1 ei saa kunagi nii kõvaks meheks kui ta ema oli
 ma ei ole küll proktoloog, aga $1 ajud on pärasoolega vahetusse läinud
 $1: kondoom peas on tõepoolest sulle sobiv riietus!
 $1 on vormis - ümmargune on ka vorm.
@@ -299,6 +297,54 @@ $1: ära tunne end halvasti - paljud inimesed on andetud
 $1: ära mõtle, sa võid oma ajud ära nikastada
 $1: palun räägi edasi, ehk ühel päeval ütled sa ka midagi tarka
 Kui ma sööksin sada kilo nisukliisid, siis mu sitt oleks parem inimene kui $1
-$1 on kahjuks langenud anentsefaalia ohvriks.
+$1 on kahjuks langenud anentsefaalia ohvriks
 $1: Su ema kepib telliste eest, et su õele litsimaja ehitada...
 $1 on kole nagu hommikune Halonen
+$1: sul pole midagi sellist viga, mida reinkarnatsioon ei parandaks
+$1 on tõestus, et jumalal on huumorimeel
+$1 aju on samahästi kui uus, kuna seda pole kunagi kasutatud
+tänu $1 jutu lugemisele on nüüd kõik siin kanalil lollimad...
+Ma just kuulsin, et $1 on haige. Loodetavasti pole see midagi kerget.
+$1 on tagasihoidlik inimene. Tal on põhjust selleks...
+$1: mulle tundub, et parim osa sinust jooksis mööda su ema persepragu alla ja lõppes pruuni plekina madratsil
+Mõned toovad rõõmu igale poole, kus nad on. Ka $1 - lahkudes.
+kui $1 auto alla jääb, siis ei ole see õnnetus.
+Mind ei sega, et $1 räägib. Vähemalt niikaua kuni ma seda kuulama ei pea.
+$1 tõestab, et ligi paari meetrine sitahunnik võib püsti püsida.
+$1: Sul on nägu mida ainult ema võiks armastada. Kuid ta vihkab sind...
+$1, külast just helistati. Nad tahavad oma lolli tagasi.
+$1: Ma ei elaks sinuga koos, isegi kui maailm oleks kusega üle ujutatud ja sa oleksid ainsa puu otsas.
+$1 on alaväärsuskompleksiga - ja täiesti põhjendatult
+$1: Kas sa sündisid paksu limase sitajunnina, või pidid selleks saamiseks vaeva nägema?
+$1: Kas su vanematel on ka mõni elus laps?
+$1: Vastandid pidavat tõmbuma. Loodetavasti kohtud kellegi ilusa, targa ja kultuursega.
+$1: Sul on sitt arvamus inimestest kui arvad, et nad on sinuga võrdsed.
+$1 on tugev nagu härg ja peaaegu sama intelligentne
+$1: Mul on hea meel, kui ütlesin sulle midagi mille pärast vabandama peaks :)
+Taburet oleks $1 jaoks võrdväärne vestluspartner.
+Ma ei tea mitu jalga on $1-l, kuid taburetil on neid umbes samapalju.
+Kui $1 kenam välja näeks, võiks ta töötada IT alal.
+$1: Tead, ma valan su munadeni betooni ja jätan suruõhuvasara kahe meetri kaugusele.
+$1, sina sinirohekollane tipitäpiline puust peaga ja plekist kõrvadega villastes sokkides lollaka naeratusega pilusilmne poolearuline ärakaranud vangi sarnane lampjalgne lasteaia lollpea, kas sa ei mäleta oma kohta?
+$1, tead sina, mine õige kasvata omale uus aju
+$1, palun loobu sellest liiva täis põlvikust, mida sa püksis kannad.
+$1: MIS SUL VIGA ON?
+$1: keri kolmikhüppega perse ja tõmba luuk ka tagant kinni
+Kui taburet tagurpidi panna, siis saab $1 koos oma pedesõbraga istuda.
+$1 kõlbab ainult litsimajja linu pesema
+$1: ebakõla sinu ja looduse vahel on sulle näkku kirjutatud
+$1: sina sitaviiul jää vait
+$1 kuskil munni ei peaks imema?
+$1 on nagu kaamel - küür seljas ja ila voolab
+$1: Miks sa minuga räägid? Ma pole puuetega laste hooldaja.
+$1: mängi endaga kusagil mujal.
+$1: tead, kui ma oleks sinu näoga, jookseks ma naerdes ketassae otsa
+$1: mine ära ja võta oma pokemon kaasa!
+$1: millal sa viimati ilma peeglit kasutamata oma munni nägid?
+$1: mängisid pipimängu jälle?
+$1: kaotasid küpsisemängus jälle?
+$1: miks sul häbe näos on?
+$1 pärast ongi piimapakkidel kiri "Ava siit"
+$1 on hea näide sellest, mis juhtub, kui õigel ajal aborti ei tehta
+$1 on nii loll, et ei läbi isegi Turingi testi
+$1 pea püsib ikka püsti - sooja õhku täis skalp ei kaalu ju palju ;)

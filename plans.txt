@@ -2,6 +2,7 @@
 3. [CENSORED]
 3. [CLASSIFIED]
 3. kõik p*rses
+3. valus {perse|m*nn}
 3. make profit
 3. räige kasum
 3. sitaks õlut
@@ -10,11 +11,11 @@
 3. lihtsalt masendav
 3. ulmeline aldaris
 3. nõukogude võim
-3. kerge joove
-3. juhani ja miina õnnelikud pulmad
+3. {kerge|raske} joove
 3. erakorralised valimised
 3. tagasi paastu ja palve juurde
 3. sittagi pole muutunud
+3. erakordselt sitt pohmakas
 3. metsas läheb elu käima
 3. naabrimutt saab infarkti
 3. tehnoloogiasektor langeb kolinal
@@ -23,18 +24,54 @@
 3. #linux.ee parimad pojad võtavad {Läti|Hollandi|Tonga|Korea|Põhja-Korea|Lõuna-Korea|Kuuba|Hiina|Andorra|Uus-Meremaa} kodakondsuse
 3. maapealne paradiis
 3. uuele katsele
-3. juhtum antakse {kaitse|majandus|kriminaal|keskkonna}politseile uurida
+3. {linux|juhtum} antakse {kaitse|majandus|kriminaal|keskkonna}politseile uurida
 3. rahvasuus hakkab liikuma lorilaul "$1"
 3. nobeli preemia
 3. spot the loony!
 3. {kesknädalas|päevalehes|minutis|äripäevas|WSJs} ilmub pisike nupuke toimunu kohta
-3. mõistus kirjutab lahkumisavalduse
+3. mõistus {kirjutab lahkumisavalduse|läheb puhkusele}
 3. peaks vist advokaadi palkama
 3. Kroonikal on jälle millest kirjutada
 3. {Elion|Elisa|Majandus- ja kommunikatsiooniministeerium} teatab, et nemad {pole süüdi|pole midagi teinud|olid puu otsas, kui pauk käis}
 3. tekib röögatu hunnik tagantjärele tarkust
-3. {kaks|kolm|neli|viis|kuus|seitse|kaheksa|üheksa|kümme|üksteist|kaksteist} kuud {hullumajas|rohelise aia taga}
+3. {kaks|kolm|neli|viis|kuus|seitse|kaheksa|üheksa|kümme|üksteist|kaksteist} kuud {hullumajas|rohelise aia taga|vabaduses}
 3. pealkiri {Äripäevas|Direktoris}: Aasta parim äriplaan on "$1"
-3. erakordselt {külm|vihmane|tuuline|tobe} talv
+3. erakordselt {külm|vihmane|tuuline|tobe|ropp} talv
 3. maakera jääb häbi pärast seisma
 3. kast viina kõigile
+3. viina defitsiit
+3. poest saab lauaviin otsa
+3. [-ise-] müüb audi maha ja ostab opeli
+3. igale pensionärile tasuta suitsuvorst
+3. ostetakse {50|50+5} tanki
+3. saabub 1000 aastane rahuriik.
+3. Eesti saab uue peaministri nõuniku.
+3. sotsiaalministeeriumil valmib esimene edukas e-lahendus.
+3. tühistatakse viimane rahareform
+3. Tapa Edasi hakkab uuesti ilmuma
+3. lihtsalt {ilge|ilgelt} sitt
+3. massirepressioonid
+3. puhas nauding
+3. nädalane orgia
+3. ilge porno
+3. kristlikud organisatsioonid avaldavad hukkamõistu
+3. Venemaa {nõuab austust|avaldab hukkamõistu}
+3. rahvusvaheline tunnustus ja tohutu edu!
+3. valitsus tellib Lätist {vee|aldarise}kahuri
+3. üle{euroopaline|maailmne} häbi, välja arvatud {Belgia|Vatikan|Belgia ja Vatikan}
+3. konstitutsiooni lisatakse põhiõigusena {Logitechi hiire|iphone} omamine
+3. kogu raha on maha joodud
+3. EIS kustutab interneti maha
+3. rootsi kardinad
+3. Katrin Lust-Buchanan kirjutab Delfisse uue nutuloo
+3. Mari-Liis Sepper {hakkab šovinistiks|vahetab sugu|nõuab mineti õpetamist|ahistab neegreid}
+3. Sa näed telepurgist hommikust Haloneni
+3. 100k preemiat ja {päeva|õhtu}lehe esikaas
+3. {Tõnu|Samuel} {noomib ropu ja sündsusetu jutu eest|ropendab}
+3. Eesti Interneti Kogukond {avaldab protesti|nõuab uusi reegleid}
+3. Halonen toob kohvikõrvaseks põhjapõdraspermat
+3. suurenenud teotahe
+3. Sama jama, uus nimi
+3. {Pikk|Lõõgastav} õhtu {hõbe|tina|foolium}mütsiga mullivannis
+3. #linux.{ee+|ee} {närib|sööb} seemneid
+3. Üleestiline reede

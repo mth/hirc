@@ -8,7 +8,7 @@ $key = lc $key . "\t";
 $len = length $key;
 my $exists;
 while (<F>) {
-	if ($key eq substr $_, 0, $len) {
+	if ($key eq lc (substr $_, 0, $len)) {
 		split /\t/;
 		print $_[2] if $_[2] =~ /\S/;
 		$exists = 1
