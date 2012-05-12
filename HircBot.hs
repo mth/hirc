@@ -22,6 +22,7 @@ import Utf8Conv
 import Calculator
 import Data.Array (elems)
 import Data.Char
+import Data.IORef
 import Data.Maybe
 import Data.List
 import qualified Data.Map as M
@@ -495,11 +496,16 @@ createPatterns cfg = foldr addCmd M.empty
                                     M.alter (Just . maybe [bind] (bind:)) cmd
         emptyRegex = makeRegex ""
 
-getConfig users =
+readConfig =
      do args <- getArgs
         s <- C.readFile (fromMaybe "hircrc" $ listToMaybe args)
-        let !cfg = read $ C.unpack $! rmComments s
-        aliasHash <- H.new (==) hashByteString
+        return $! read $ C.unpack $! rmComments s
+  where rmComments = C.unlines . filter notComment . C.lines
+        notComment s = let s' = C.dropWhile isSpace s in
+                       C.null s' || C.head s' /= '#'
+
+initConfig !users !cfg =
+     do aliasHash <- H.new (==) hashByteString
         mapM_ (\(k, v) -> H.update aliasHash k v) (define cfg)
         return $! ConfigSt {
             raw = cfg,
@@ -517,24 +523,23 @@ getConfig users =
                                 M.alter (Just . maybe perms (perms ++)) perm
         getPerm (':':group) = Group group
         getPerm user = Client (makeRegex ('^':permPattern user ++ "$"))
-        rmComments = C.unlines . filter notComment . C.lines
-        notComment s = let s' = C.dropWhile isSpace s in
-                       C.null s' || C.head s' /= '#'
         permPattern (c:s) = case c of
                             '*' -> '.':'*':permPattern s
                             '.' -> '\\':'.':permPattern s
                             _ -> c:permPattern s
         permPattern "" = ""
 
+getConfig users = readConfig >>= initConfig users
+
 main = 
      do initEnv
         hSetBuffering stdout LineBuffering
-        users <- H.new (==) hashByteString
-        getConfig users >>= connect 0
-  where connect nth config =
-             do let cfg = raw config
-                    servers' = servers cfg
+        readConfig >>= connect 0
+  where connect nth cfg =
+             do let servers' = servers cfg
                     (host, port) = servers' !! (nth `mod` length servers')
+                users <- H.new (==) hashByteString
+                config <- initConfig users cfg >>= newIORef
                 appendFile "seen.dat" "\n"
                 catch (connectIrc host port (nick cfg) bot config)
                       (failed nth config)
@@ -542,4 +547,4 @@ main =
              do putStrLn ("Reconnect after 1 min: Error occured: " ++ show ex)
                 threadDelay 60000000
                 putStrLn "Reconnecting..."
-                connect (nth + 1) config
+                readIORef config >>= connect (nth + 1) . raw

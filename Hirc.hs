@@ -146,14 +146,13 @@ processIrc handler = run wait
 
 connectIrc :: Integral a => String -> a -> String
                          -> ((C.ByteString, String, [C.ByteString]) -> Irc c ())
-                         -> c -> IO ()
-connectIrc host port nick handler cfg =
+                         -> IORef c -> IO ()
+connectIrc host port nick handler cfgRef =
      do h <- connectTo host (PortNumber $ fromIntegral port)
         hSetEncoding h latin1
         lastPong <- newMVar 0
         sync <- newMVar ()
         buf <- newChan
-        cfgRef <- newIORef cfg
         nick' <- newIORef cnick
         quit <- newIORef False
         let ctx = IrcCtx h lastPong sync buf cfgRef nick' quit
