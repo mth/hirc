@@ -535,7 +535,7 @@ main =
      do initEnv
         hSetBuffering stdout LineBuffering
         readConfig >>= connect 0
-  where connect nth cfg =
+  where connect !nth !cfg =
              do let servers' = servers cfg
                     (host, port) = servers' !! (nth `mod` length servers')
                 users <- H.new (==) hashByteString
@@ -543,7 +543,7 @@ main =
                 appendFile "seen.dat" "\n"
                 catch (connectIrc host port (nick cfg) bot config)
                       (failed nth config)
-        failed nth config ex =
+        failed !nth !config ex =
              do putStrLn ("Reconnect after 1 min: Error occured: " ++ show ex)
                 threadDelay 60000000
                 putStrLn "Reconnecting..."
