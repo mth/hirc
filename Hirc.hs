@@ -37,7 +37,7 @@ import System.Environment
 import System.Mem
 import System.Random
 
-data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
+data IrcCtx c = IrcCtx { conn :: !Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [C.ByteString],
                          config :: IORef c,
                          currentNick :: IORef C.ByteString,

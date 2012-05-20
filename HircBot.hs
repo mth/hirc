@@ -47,18 +47,18 @@ data EncodingSpec = Utf8 | Latin1 | Raw
     deriving Read
 
 data EventSpec =
-    Send String [C.ByteString] |
-    Say C.ByteString | SayTo C.ByteString C.ByteString |
-    Join C.ByteString | Quit C.ByteString | Perm String |
-    IfPerm String [EventSpec] [EventSpec] | RandLine String |
-    Exec String [C.ByteString] | Plugin [String] C.ByteString |
-    ExecMaxLines Int String [C.ByteString] |
-    Http C.ByteString C.ByteString Int Regex [EventSpec] |
-    Calc C.ByteString | Append String C.ByteString | Rehash |
-    Call C.ByteString [C.ByteString]
+    Send !String [C.ByteString] |
+    Say !C.ByteString | SayTo !C.ByteString !C.ByteString |
+    Join !C.ByteString | Quit !C.ByteString | Perm !String |
+    IfPerm !String [EventSpec] [EventSpec] | RandLine !String |
+    Exec !String [C.ByteString] | Plugin [String] !C.ByteString |
+    ExecMaxLines !Int String [C.ByteString] |
+    Http !C.ByteString !C.ByteString !Int !Regex [EventSpec] |
+    Calc !C.ByteString | Append !String !C.ByteString | Rehash |
+    Call !C.ByteString [C.ByteString]
     deriving Read
 
-data AllowSpec = Client Regex | Group String
+data AllowSpec = Client !Regex | Group String
 
 instance Read Regex where
     readsPrec _ ('/':(!s)) =
@@ -76,9 +76,9 @@ instance Read Regex where
     readsPrec _ _ = []
 
 data Config = Config {
-    servers  :: [(String, Integer)],
+    servers  :: [(String, Int)],
     nick     :: String,
-    encoding :: EncodingSpec,
+    encoding :: !EncodingSpec,
     define   :: [(C.ByteString, [EventSpec])],
     messages :: [(Regex, [EventSpec])],
     commands :: [(String, [Regex], [EventSpec])],
@@ -95,14 +95,14 @@ type Bot a = Irc ConfigSt a
 type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
 data User = User {
-    rank :: Int,
-    spoke :: C.ByteString
+    rank :: !Int,
+    spoke :: !C.ByteString
 }
 
 data ConfigSt = ConfigSt {
-    raw :: Config,
+    raw :: !Config,
     encodeInput :: String -> String,
-    patterns :: ConfigPatterns,
+    patterns :: !ConfigPatterns,
     aliasMap :: H.HashTable C.ByteString [EventSpec],
     perms :: M.Map String [AllowSpec],
     -- Map nick (Map channel User)
