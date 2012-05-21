@@ -84,19 +84,18 @@ data ConfigItem =
 
 notComment s = let s' = C.dropWhile isSpace s in C.null s' || C.head s' /= '#'
 rmComments = C.unlines . filter notComment . C.lines
-put x = putStrLn (show x ++ ",")
 
 main = do
     args <- getArgs
     s <- C.readFile (fromMaybe "hircrc" $ listToMaybe args)
     let !cfg = read $ C.unpack $! rmComments s
-    mapM_ (\(s,p) -> put (Server s p)) (servers cfg)
-    put (Nick (nick cfg))
+    mapM_ (\(s,p) -> print (Server s p)) (servers cfg)
+    print (Nick (nick cfg))
     case (encoding cfg) of
-        Utf8 -> putStrLn "Utf8,"
-        Latin1 -> putStrLn "Latin,"
+        Utf8 -> putStrLn "Utf8"
+        Latin1 -> putStrLn "Latin"
         Raw -> return ()
-    mapM_ (\(r,e) -> put (On r (EList e))) (messages cfg)
-    mapM_ (\(c,p,e) -> put (Command c p (EList e))) (commands cfg)
-    mapM_ (\(s,l) -> put (Permit s (SList l))) (permits cfg)
-    put (NoPermit (EList (nopermit cfg)))
+    mapM_ (\(r,e) -> print (On r (EList e))) (messages cfg)
+    mapM_ (\(c,p,e) -> print (Command c p (EList e))) (commands cfg)
+    mapM_ (\(s,l) -> print (Permit s (SList l))) (permits cfg)
+    print (NoPermit (EList (nopermit cfg)))
