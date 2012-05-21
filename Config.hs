@@ -1,5 +1,5 @@
 {-
- - HircBot - Simple IRC bot in haskell.
+ - HircBot configuration parsing functions.
  - Copyright (C) 2008-2011  Madis Janson
  -
  - This file is part of HircBot.
@@ -17,30 +17,31 @@
  - You should have received a copy of the GNU General Public License
  - along with HircBot.  If not, see <http://www.gnu.org/licenses/>.
  -}
-import Utf8Conv
-import Calculator
-import Data.Array (elems)
+module Config where
+
+-- import Utf8Conv
+-- import Data.Array (elems)
 import Data.Char
-import Data.IORef
-import Data.Maybe
-import Data.List
-import qualified Data.Map as M
-import qualified Data.HashTable as H
+-- import Data.IORef
+-- import Data.Maybe
+-- import Data.List
+-- import qualified Data.Map as M
+-- import qualified Data.HashTable as H
 import qualified Data.ByteString.Char8 as C
-import Control.Monad
-import Control.Concurrent
+-- import Control.Monad
+-- import Control.Concurrent
 import Text.Regex.Posix
-import System.Environment
-import System.Exit
-import System.Time
-import System.Random
-import System.Posix.IO
-import System.Posix.Signals
-import System.Posix.Process
-import System.Posix.Types
+-- import System.Environment
+-- import System.Exit
+-- import System.Time
+-- import System.Random
+-- import System.Posix.IO
+-- import System.Posix.Signals
+-- import System.Posix.Process
+-- import System.Posix.Types
 import System.IO
-import qualified Network.HTTP as H
-import Network.URI
+-- import qualified Network.HTTP as H
+-- import Network.URI
 
 data EncodingSpec = Utf8 | Latin1 | Raw
     deriving Read
@@ -88,10 +89,10 @@ data Config = Config {
 data ConfigItem =
     Server String Integer |
     Nick String |
-    On Regex EventSpecs |
-    Command String [Regex] EventSpecs |
-    Permit String Strings |
-    NoPermit EventSpecs deriving Read, Show
+    On Regex [EventSpec] |
+    Command String [Regex] [EventSpec] |
+    Permit String [String] |
+    NoPermit [EventSpec] deriving Read
 
 parseConfigItems :: String -> [ConfigItem]
 parseConfigItems str = skip parse 1 str
@@ -101,9 +102,9 @@ parseConfigItems str = skip parse 1 str
         skip tr line str = tr line str
         parse line str = case reads str of
             ((result, tail):_) ->
-                let len = length s - length tail in
-                let !nl = line + length (filter (== '\n') (take len)) in
+                let len = length str - length tail in
+                let !nl = line + length (filter (== '\n') (take len str)) in
                 result : skip err nl tail
             _ -> error (show line ++ ": syntax error")
-        err line _ = error (show line ++ ": expected newline after definition"))
+        err line _ = error (show line ++ ": expected newline after definition")
 

@@ -17,6 +17,7 @@
  - You should have received a copy of the GNU General Public License
  - along with HircBot.  If not, see <http://www.gnu.org/licenses/>.
  -}
+import Config
 import Hirc
 import Utf8Conv
 import Calculator
@@ -42,49 +43,6 @@ import System.Posix.Types
 import System.IO
 import qualified Network.HTTP as H
 import Network.URI
-
-data EncodingSpec = Utf8 | Latin1 | Raw
-    deriving Read
-
-data EventSpec =
-    Send !String [C.ByteString] |
-    Say !C.ByteString | SayTo !C.ByteString !C.ByteString |
-    Join !C.ByteString | Quit !C.ByteString | Perm !String |
-    IfPerm !String [EventSpec] [EventSpec] | RandLine !String |
-    Exec !String [C.ByteString] | Plugin [String] !C.ByteString |
-    ExecMaxLines !Int String [C.ByteString] |
-    Http !C.ByteString !C.ByteString !Int !Regex [EventSpec] |
-    Calc !C.ByteString | Append !String !C.ByteString | Rehash |
-    Call !C.ByteString [C.ByteString]
-    deriving Read
-
-data AllowSpec = Client !Regex | Group String
-
-instance Read Regex where
-    readsPrec _ ('/':(!s)) =
-        let parse ('\\':'x':a:b:cs) acc =
-                parse cs $! chr ((ord a - 48) * 16 + ord b - 48) : acc
-            parse ('\\':'/':cs) acc = parse cs $! '/':acc
-            parse ('/':'i':cs) acc = [(regex compIgnoreCase acc, cs)]
-            parse ('/':cs) acc = [(regex 0 acc, cs)]
-            parse (c:cs) acc = parse cs $! c:acc
-            parse "" _ = []
-            regex opt s = makeRegexOpts (opt + compExtended) execBlank
-                            $! C.reverse $! C.pack s in
-        parse s ""
-    readsPrec x (c:cs) | isSpace c = readsPrec x cs
-    readsPrec _ _ = []
-
-data Config = Config {
-    servers  :: [(String, Int)],
-    nick     :: String,
-    encoding :: !EncodingSpec,
-    define   :: [(C.ByteString, [EventSpec])],
-    messages :: [(Regex, [EventSpec])],
-    commands :: [(String, [Regex], [EventSpec])],
-    permits  :: [(String, [String])],
-    nopermit :: [EventSpec]
-} deriving Read
 
 data PluginId = ExecPlugin [String]
     deriving (Show, Eq, Ord)
