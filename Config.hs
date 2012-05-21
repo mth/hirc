@@ -95,6 +95,7 @@ parseConfigItems str = skip parse 1 str
             _ -> error (show line ++ ": syntax error")
         err line _ = error (show line ++ ": expected newline after definition")
 
+-- XXX the items argument should be given in reverse order
 collectConfig :: [ConfigItem] -> Config -> Config
 collectConfig (item : items) cfg =
     collectConfig items $ case item of
