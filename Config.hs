@@ -72,10 +72,12 @@ data Config = Config {
 type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
 data ConfigItem =
-    Server String Integer |
+    Server String Int |
     Nick String |
+    Encoding EncodingSpec |
     On Regex [EventSpec] |
     Command String [Regex] [EventSpec] |
+    Define C.ByteString [EventSpec] |
     Permit String [String] |
     NoPermit [EventSpec] deriving Read
 
@@ -92,6 +94,21 @@ parseConfigItems str = skip parse 1 str
                 result : skip err nl tail
             _ -> error (show line ++ ": syntax error")
         err line _ = error (show line ++ ": expected newline after definition")
+
+collectConfig :: [ConfigItem] -> Config -> Config
+collectConfig (item : items) cfg =
+    collectConfig items $ case item of
+        (Server host port) -> cfg { servers = (host, port) : servers cfg }
+        (Nick nick)     -> cfg { nick = nick }
+        (Encoding spec) -> cfg { encoding = spec }
+        (On re events)  -> cfg { messages = (re, events) : messages cfg }
+        (Command cmd re events) ->
+            cfg { commands = (cmd, re, events) : commands cfg }
+        (Define name events) -> cfg { define = (name, events) : define cfg }
+        (Permit name masks) -> cfg { permits = (name, masks) : permits cfg }
+        (NoPermit events) -> cfg { nopermit = events ++ nopermit cfg }
+
+collectConfig [] cfg = cfg
 
 createPatterns :: Config -> ConfigPatterns
 createPatterns cfg = foldr addCmd M.empty
