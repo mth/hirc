@@ -1,6 +1,6 @@
 {-
  - HircBot configuration parsing functions.
- - Copyright (C) 2008-2011  Madis Janson
+ - Copyright (C) 2008-2012  Madis Janson
  -
  - This file is part of HircBot.
  - 
