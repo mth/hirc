@@ -19,29 +19,12 @@
  -}
 module Config where
 
--- import Utf8Conv
--- import Data.Array (elems)
 import Data.Char
--- import Data.IORef
--- import Data.Maybe
--- import Data.List
--- import qualified Data.Map as M
--- import qualified Data.HashTable as H
+import Data.Maybe
+import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as C
--- import Control.Monad
--- import Control.Concurrent
 import Text.Regex.Posix
--- import System.Environment
--- import System.Exit
--- import System.Time
--- import System.Random
--- import System.Posix.IO
--- import System.Posix.Signals
--- import System.Posix.Process
--- import System.Posix.Types
-import System.IO
--- import qualified Network.HTTP as H
--- import Network.URI
+import System.Environment
 
 data EncodingSpec = Utf8 | Latin1 | Raw
     deriving Read
@@ -86,6 +69,8 @@ data Config = Config {
     nopermit :: [EventSpec]
 } deriving Read
 
+type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
+
 data ConfigItem =
     Server String Integer |
     Nick String |
@@ -107,4 +92,22 @@ parseConfigItems str = skip parse 1 str
                 result : skip err nl tail
             _ -> error (show line ++ ": syntax error")
         err line _ = error (show line ++ ": expected newline after definition")
+
+createPatterns :: Config -> ConfigPatterns
+createPatterns cfg = foldr addCmd M.empty
+    (commands cfg ++
+        map (\(pattern, event) -> ("PRIVMSG", [emptyRegex, pattern], event))
+            (messages cfg))
+  where addCmd (cmd, args, event) = let bind = (args, event) in
+                                    M.alter (Just . maybe [bind] (bind:)) cmd
+        emptyRegex = makeRegex ""
+
+readConfig :: IO Config
+readConfig =
+     do args <- getArgs
+        s <- C.readFile (fromMaybe "hircrc" $ listToMaybe args)
+        return $! read $ C.unpack $! rmComments s
+  where rmComments = C.unlines . filter notComment . C.lines
+        notComment s = let s' = C.dropWhile isSpace s in
+                       C.null s' || C.head s' /= '#'
 

@@ -32,7 +32,6 @@ import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
 import Text.Regex.Posix
-import System.Environment
 import System.Exit
 import System.Time
 import System.Random
@@ -50,7 +49,6 @@ data PluginId = ExecPlugin [String]
 data PluginCmd = PluginMsg C.ByteString C.ByteString | KillPlugin
 
 type Bot a = Irc ConfigSt a
-type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
 data User = User {
     rank :: !Int,
@@ -444,23 +442,6 @@ bot' msg@(prefix, cmd, args) =
                   _ -> Nothing
         reply = say replyTo
         from = C.takeWhile (/= '!') prefix
-
-createPatterns :: Config -> ConfigPatterns
-createPatterns cfg = foldr addCmd M.empty
-    (commands cfg ++
-        map (\(pattern, event) -> ("PRIVMSG", [emptyRegex, pattern], event))
-            (messages cfg))
-  where addCmd (cmd, args, event) = let bind = (args, event) in
-                                    M.alter (Just . maybe [bind] (bind:)) cmd
-        emptyRegex = makeRegex ""
-
-readConfig =
-     do args <- getArgs
-        s <- C.readFile (fromMaybe "hircrc" $ listToMaybe args)
-        return $! read $ C.unpack $! rmComments s
-  where rmComments = C.unlines . filter notComment . C.lines
-        notComment s = let s' = C.dropWhile isSpace s in
-                       C.null s' || C.head s' /= '#'
 
 initConfig !users !cfg =
      do aliasHash <- H.new (==) hashByteString
