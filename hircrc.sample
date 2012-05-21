@@ -1,67 +1,90 @@
-Config {
-	servers = [("irc.datanet.ee", 6667)],
-	nick = "Hircb0t",
-	encoding = Utf8,
-	define = [],
-	messages = [
-		(/^!quit$/, [Perm "root", Quit "Returning to hell..."]),
-		(/^!reload$/, [Perm "root", Rehash, Say "Matrix ok."]),
-		(/^= ([^:?]*)$/, [Calc "$1"]),
-		(/^(\?\?? .*|!\? .*|!new$)/,
-		 [Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
-		(/^((!learn|!add) .*)/,
-		 [Perm "mdict", Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
-		(/^((!brainwash|!bite|!forget) .*)/,
-		 [Perm "dict", Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
-		(/^!say\s+((!learn|!add) .*)/,
-		 [Perm "mdict", Append "say.log" "<$:> $1\n", SayTo "#hirctest" "$1",
-		  Plugin ["/usr/bin/perl", "dict.pl"] "$: $1"]),
-		(/^!insult\s+(\S(.*\S)?)\s*$/, [Perm "dict", RandLine "insult.txt"]),
-		(/^!insult\s*$/, [RandLine "insult.txt"]),
-		(/^!compliment\s+(\S(.*\S)?)\s*$/, [RandLine "compliments.txt"]),
-		(/^!history +([^ ].*)/, [Perm "dict", Exec "./history" ["base.dict", "$1"]]),
-		(/^!seen *$/, [RandLine "insult.txt"]),
-		(/^!seen +([^ ]+)/, [Exec "/usr/bin/perl" ["seen.pl", "$0", "$1"]]),
-		(/^!decide\s+(\S.*)$/,
-		 [Exec "/usr/bin/perl" ["decide.pl", "$1"]]),
-		(/^!plan\s+(\S.*)$/, [Perm "mdict",
-			Say "1. $1", Say "2. ...", RandLine "plans.txt"]),
-		(/^!time$/, [Exec "/bin/date" []]),
-		(/^!country\s+(\w+)/,
-		 [Exec "./acrogrep" ["countries.txt", "$1"]]),
-		(/^!say\s+((m8ga\W*|T3EE\W*)*(.*))$/,
-		  [Perm "mdict", Append "say.log" "<$:> $1\n",
-		   SayTo "#hirctest" "$3"]),
-		(/^!emote\s+(.*)$/,
-		  [Perm "mdict", Append "say.log" "* $:\^I$1\n",
-		   SayTo "#hirctest" "\^AACTION $1\^A"]),
-		(/^!ilm$/, [Plugin ["/usr/bin/perl", "ilm.pl"] ""]),
-		(/^!vera +(\w+)/, [Exec "./acrogrep" ["vera.txt", "$1"]]),
-		(/^!rfc +(\w+)/, [Exec "/usr/bin/perl" ["find-rfc.pl", "$1"]]),
-		(/^!help *$/,
- [Say "? ?? !? !add !bite !brainwash !compliment !country !decide !emote !forget !help !history !i-am-idiot !ilm !insult !new !ping !plan !rfc !say !seen !tnick !time !vera"]),
- 		(/^!help +i-am-idiot *$/, [Say "No cure for that"]),
- 		(/^!help +!i-am-idiot *$/, [Say "Yes, you are."]),
- 		(/^!help +bite *$/, [Say "Hammustab definitsioonil | saba ära"]),
-		(/^!help \W/, [Say "No help, go find a rope"]),
-		(/^!ping( |$)/, [Say "PONG!!!"]),
-		(/^!isitfriday( |$)/, [Exec "/usr/bin/perl" ["isitfriday.pl"]]),
-		(/^Tuxaator_?[:,] /, [RandLine "talk.txt"]),
-		(/^!tnick +(\w+)/, [Perm "root", Send "NICK" ["$1"]]),
-		(/^!format( |$)/, [Say "Not an abacus"]),
-		(/^\x01VERSION\x01$/,
-			[Send "NOTICE" ["$0", "\^AVERSION HircB0t v0.0v\^A"]])
-	],
-	commands = [
-		("CONNECTED", [], [Join "#hirctest"]),
-		("INVITE", [//, /^#hirctest$/], [Join "#hirctest"]),
-		("366", [//, /(.*)/], [SayTo "$1"  "Kurat, ma olen jälle siin..."])
-	],
-	permits = [
-		("root", ["*!~qwr@atsgw.cyber.ee"]),
-		("mdict", [":dict", ":+"]),
-		("dict", [":root", ":@",
-			  "mzz!mzz@uba.linux.ee"])
-	],
-	nopermit = [RandLine "insult.txt"]
-}
+Server "irc.datanet.ee" 6667
+Nick "Hircb0t"
+Encoding Utf8
+On /^!quit$/ [
+	Perm "root",
+	Quit "Returning to hell..."
+]
+On /^!reload$/ [
+	Perm "root",
+	Rehash,
+	Say "Matrix ok."
+]
+On /^= ([^:?]*)$/ [Calc "$1"]
+On /^(\?\?? .*|!\? .*|!new$)/ [Plugin ["/usr/bin/perl","dict.pl"] "$: $1"]
+On /^((!learn|!add) .*)/ [
+	Perm "mdict",
+	Plugin ["/usr/bin/perl","dict.pl"] "$: $1"
+]
+On /^((!brainwash|!bite|!forget) .*)/ [
+	Perm "dict",
+	Plugin ["/usr/bin/perl","dict.pl"] "$: $1"
+]
+On /^!say\s+((!learn|!add) .*)/ [
+	Perm "mdict",
+	Append "say.log" "<$:> $1\n",
+	SayTo "#hirctest" "$1",
+	Plugin ["/usr/bin/perl","dict.pl"] "$: $1"
+]
+On /^!insult\s+(\S(.*\S)?)\s*$/ [
+	Perm "dict",
+	RandLine "insult.txt"
+]
+On /^!insult\s*$/ [RandLine "insult.txt"]
+On /^!compliment\s+(\S(.*\S)?)\s*$/ [RandLine "compliments.txt"]
+On /^!history +([^ ].*)/ [
+	Perm "dict",
+	Exec "./history" ["base.dict","$1"]
+]
+On /^!seen *$/ [RandLine "insult.txt"]
+On /^!seen +([^ ]+)/ [Exec "/usr/bin/perl" ["seen.pl","$0","$1"]]
+On /^!decide\s+(\S.*)$/ [Exec "/usr/bin/perl" ["decide.pl","$1"]]
+On /^!plan\s+(\S.*)$/ [
+	Perm "mdict",
+	Say "1. $1",
+	Say "2. ...",
+	RandLine "plans.txt"
+]
+On /^!time$/ [Exec "/bin/date" []]
+On /^!country\s+(\w+)/ [Exec "./acrogrep" ["countries.txt","$1"]]
+On /^!say\s+((m8ga\W*|T3EE\W*)*(.*))$/ [
+	Perm "mdict",
+	Append "say.log" "<$:> $1\n",
+	SayTo "#hirctest" "$3"
+]
+On /^!emote\s+(.*)$/ [
+	Perm "mdict",
+	Append "say.log" "* $:\t$1\n",
+	SayTo "#hirctest" "\SOHACTION $1\SOH"
+]
+On /^!ilm$/ [Plugin ["/usr/bin/perl","ilm.pl"] ""]
+On /^!vera +(\w+)/ [Exec "./acrogrep" ["vera.txt","$1"]]
+On /^!rfc +(\w+)/ [Exec "/usr/bin/perl" ["find-rfc.pl","$1"]]
+On /^!help *$/ [Say "? ?? !? !add !bite !brainwash !compliment !country !decide !emote !forget !help !history !i-am-idiot !ilm !insult !new !ping !plan !rfc !say !seen !tnick !time !vera"]
+On /^!help +i-am-idiot *$/ [Say "No cure for that"]
+On /^!help +!i-am-idiot *$/ [Say "Yes, you are."]
+On /^!help +bite *$/ [Say "Hammustab definitsioonil | saba \195\164ra"]
+On /^!help \W/ [Say "No help, go find a rope"]
+On /^!ping( |$)/ [Say "PONG!!!"]
+On /^!isitfriday( |$)/ [Exec "/usr/bin/perl" ["isitfriday.pl"]]
+On /^Tuxaator_?[:,] / [RandLine "talk.txt"]
+On /^!tnick +(\w+)/ [
+	Perm "root",
+	Send "NICK" ["$1"]
+]
+On /^!format( |$)/ [Say "Not an abacus"]
+On /^\x01VERSION\x01$/ [Send "NOTICE" ["$0","\SOHVERSION HircB0t v0.0v\SOH"]]
+Command "CONNECTED" [] [Join "#hirctest"]
+Command "INVITE" [//,/^#hirctest$/] [Join "#hirctest"]
+Command "366" [//,/(.*)/] [SayTo "$1" "Kurat, ma olen j\195\164lle siin..."]
+Permit "root" ["*!~qwr@atsgw.cyber.ee"]
+Permit "mdict" [
+	":dict",
+	":+"
+]
+Permit "dict" [
+	":root",
+	":@",
+	"mzz!mzz@uba.linux.ee"
+]
+NoPermit [RandLine "insult.txt"]

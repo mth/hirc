@@ -21,6 +21,7 @@ module Config where
 
 import Data.Char
 import Data.Maybe
+import Data.List (isPrefixOf)
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as C
 import Text.Regex.Posix
@@ -124,8 +125,15 @@ readConfig :: IO Config
 readConfig =
      do args <- getArgs
         s <- C.readFile (fromMaybe "hircrc" $ listToMaybe args)
-        return $! read $ C.unpack $! rmComments s
+        let !cfg = parse $! C.unpack $! rmComments s
+        if null (servers cfg)
+            then fail "No servers defined in configuration"
+            else return $! cfg
   where rmComments = C.unlines . filter notComment . C.lines
         notComment s = let s' = C.dropWhile isSpace s in
                        C.null s' || C.head s' /= '#'
-
+        parse str | "Config " `isPrefixOf` dropWhile isSpace str = read str
+        parse str = collectConfig (reverse $ parseConfigItems str) Config {
+            servers = [], nick = "HircB0t", encoding = Utf8, define = [],
+            messages = [], commands = [], permits = [], nopermit = []
+        }

@@ -77,6 +77,7 @@ instance Show Strings where show (SList l) = str l
 data ConfigItem =
     Server String Integer |
     Nick String |
+    Encoding EncodingSpec |
     On Regex EventSpecs |
     Command String [Regex] EventSpecs |
     Permit String Strings |
@@ -91,10 +92,7 @@ main = do
     let !cfg = read $ C.unpack $! rmComments s
     mapM_ (\(s,p) -> print (Server s p)) (servers cfg)
     print (Nick (nick cfg))
-    case (encoding cfg) of
-        Utf8 -> putStrLn "Utf8"
-        Latin1 -> putStrLn "Latin"
-        Raw -> return ()
+    print (Encoding (encoding cfg))
     mapM_ (\(r,e) -> print (On r (EList e))) (messages cfg)
     mapM_ (\(c,p,e) -> print (Command c p (EList e))) (commands cfg)
     mapM_ (\(s,l) -> print (Permit s (SList l))) (permits cfg)
