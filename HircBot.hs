@@ -579,7 +579,7 @@ initConfig !users !cfg =
                          tr (h, t) = h : (case C.head t of
                                           '*' -> C.pack ".*"
                                           '.' -> C.pack "\\."
-                                          _ -> C.empty) : escapePerm t
+                                          _ -> C.empty) : escapePerm (C.tail t)
                      in tr . C.break (\c -> c == '*' || c == '.')
 
 getConfig users = readConfig >>= initConfig users
