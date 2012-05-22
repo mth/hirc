@@ -66,20 +66,20 @@ data Config = Config {
     define   :: [(C.ByteString, [EventSpec])],
     messages :: [(Regex, [EventSpec])],
     commands :: [(String, [Regex], [EventSpec])],
-    permits  :: [(C.ByteString, [String])],
+    permits  :: [(C.ByteString, [C.ByteString])],
     nopermit :: [EventSpec]
 } deriving Read
 
 type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
 data ConfigItem =
-    Server String Int |
+    Server String !Int |
     Nick String |
-    Encoding EncodingSpec |
-    On Regex [EventSpec] |
+    Encoding !EncodingSpec |
+    On !Regex [EventSpec] |
     Command String [Regex] [EventSpec] |
-    Define C.ByteString [EventSpec] |
-    Permit C.ByteString [String] |
+    Define !C.ByteString [EventSpec] |
+    Permit !C.ByteString [C.ByteString] |
     NoPermit [EventSpec] deriving Read
 
 parseConfigItems :: String -> [ConfigItem]

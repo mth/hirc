@@ -461,8 +461,9 @@ initConfig !users !cfg =
         }
   where addPerm (perm, users) = let perms = map getPerm users in
                                 M.alter (Just . maybe perms (perms ++)) perm
-        getPerm (':':group) = Group (C.pack group)
-        getPerm user = Client (makeRegex ('^':permPattern user ++ "$"))
+        getPerm user =
+            if not (C.null user) && C.head user == ':' then Group (C.tail user)
+                else Client (makeRegex ('^':permPattern (C.unpack user) ++ "$"))
         permPattern (c:s) = case c of
                             '*' -> '.':'*':permPattern s
                             '.' -> '\\':'.':permPattern s
