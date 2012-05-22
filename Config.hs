@@ -33,8 +33,8 @@ data EncodingSpec = Utf8 | Latin1 | Raw
 data EventSpec =
     Send !String [C.ByteString] |
     Say !C.ByteString | SayTo !C.ByteString !C.ByteString |
-    Join !C.ByteString | Quit !C.ByteString | Perm !String |
-    IfPerm !String [EventSpec] [EventSpec] | RandLine !String |
+    Join !C.ByteString | Quit !C.ByteString | Perm !C.ByteString |
+    IfPerm !C.ByteString [EventSpec] [EventSpec] | RandLine !String |
     Exec !String [C.ByteString] | Plugin [String] !C.ByteString |
     ExecMaxLines !Int String [C.ByteString] |
     Http !C.ByteString !C.ByteString !Int !Regex [EventSpec] |
@@ -42,7 +42,7 @@ data EventSpec =
     Call !C.ByteString [C.ByteString]
     deriving Read
 
-data AllowSpec = Client !Regex | Group String
+data AllowSpec = Client !Regex | Group C.ByteString
 
 instance Read Regex where
     readsPrec _ ('/':(!s)) =
@@ -66,7 +66,7 @@ data Config = Config {
     define   :: [(C.ByteString, [EventSpec])],
     messages :: [(Regex, [EventSpec])],
     commands :: [(String, [Regex], [EventSpec])],
-    permits  :: [(String, [String])],
+    permits  :: [(C.ByteString, [String])],
     nopermit :: [EventSpec]
 } deriving Read
 
@@ -79,7 +79,7 @@ data ConfigItem =
     On Regex [EventSpec] |
     Command String [Regex] [EventSpec] |
     Define C.ByteString [EventSpec] |
-    Permit String [String] |
+    Permit C.ByteString [String] |
     NoPermit [EventSpec] deriving Read
 
 parseConfigItems :: String -> [ConfigItem]

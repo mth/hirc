@@ -60,7 +60,7 @@ data ConfigSt = ConfigSt {
     encodeInput :: String -> String,
     patterns :: !ConfigPatterns,
     aliasMap :: H.HashTable C.ByteString [EventSpec],
-    perms :: M.Map String [AllowSpec],
+    perms :: M.Map C.ByteString [AllowSpec],
     -- Map nick (Map channel User)
     users :: H.HashTable C.ByteString (M.Map C.ByteString User),
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
@@ -354,14 +354,13 @@ invokePlugin id to msg =
  - CORE
  -}
 checkPerm :: Maybe C.ByteString -> C.ByteString -> C.ByteString
-             -> String -> Bot Bool
+             -> C.ByteString -> Bot Bool
 checkPerm channel nick prefix perm =
      do cfg <- ircConfig
-        let hasPerm "+" = hasRank 1
-            hasPerm "%" = hasRank 2
-            hasPerm "@" = hasRank 3
-            hasPerm perm =
-                anyPerm $! concat $! maybeToList $! M.lookup perm (perms cfg)
+        let hasPerm perm = case lookup perm permRanks of
+                Just rank -> hasRank rank
+                Nothing -> anyPerm $! concat $! maybeToList
+                                   $! M.lookup perm (perms cfg)
             anyPerm (perm:rest) =
              do ok <- case perm of
                       Client re -> return $! (matchOnce re prefix) /= Nothing
@@ -377,6 +376,8 @@ checkPerm channel nick prefix perm =
                 Just ch -> fmap (maybe False ((>= expectRank) . rank))
                                 (getUser ch nick)
         hasPerm perm
+  where permRanks = [(C.singleton '+', 1), (C.singleton '%', 2),
+                     (C.singleton '@', 3)]
 
 -- wrapper that encodes irc input into desired charset
 bot :: (C.ByteString, String, [C.ByteString]) -> Bot ()
@@ -460,7 +461,7 @@ initConfig !users !cfg =
         }
   where addPerm (perm, users) = let perms = map getPerm users in
                                 M.alter (Just . maybe perms (perms ++)) perm
-        getPerm (':':group) = Group group
+        getPerm (':':group) = Group (C.pack group)
         getPerm user = Client (makeRegex ('^':permPattern user ++ "$"))
         permPattern (c:s) = case c of
                             '*' -> '.':'*':permPattern s
