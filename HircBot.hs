@@ -565,14 +565,15 @@ initConfig !users !cfg =
                           Raw -> id,
             patterns = createPatterns cfg,
             aliasMap = aliasHash,
-            perms = M.fromList $! map getPerms (permits cfg),
+            perms = foldr addPerm M.empty (permits cfg),
             plugins = M.empty,
             users = users
         }
-  where getPerms (perm, users) = (perm, map getPerm users)
+  where addPerm (perm, users) = let perms = map getPerm users in
+                                M.alter (Just . maybe perms (perms ++)) perm
         getPerm user =
             if not (C.null user) && C.head user == ':' then Group (C.tail user)
-                else Client $! makeRegex $! permPattern user
+                else Client (makeRegex (permPattern user))
         permPattern s = C.concat $! C.singleton '^' : escapePerm s
         escapePerm = tr . C.break (\c -> c == '*' || c == '.')
         tr (!h, t) | C.null t = [h, C.singleton '$']
