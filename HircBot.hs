@@ -463,12 +463,14 @@ initConfig !users !cfg =
                                 M.alter (Just . maybe perms (perms ++)) perm
         getPerm user =
             if not (C.null user) && C.head user == ':' then Group (C.tail user)
-                else Client (makeRegex ('^':permPattern (C.unpack user) ++ "$"))
-        permPattern (c:s) = case c of
-                            '*' -> '.':'*':permPattern s
-                            '.' -> '\\':'.':permPattern s
-                            _ -> c:permPattern s
-        permPattern "" = ""
+                else Client (makeRegex (permPattern user))
+        permPattern s = C.concat (C.singleton '^' : escapePerm s)
+        escapePerm = let tr (h, t) | C.null t = [h, C.singleton '$']
+                         tr (h, t) = h : (case C.head t of
+                                          '*' -> C.pack ".*"
+                                          '.' -> C.pack "\\."
+                                          _ -> C.empty) : escapePerm t
+                     in tr . C.break (\c -> c == '*' || c == '.')
 
 getConfig users = readConfig >>= initConfig users
 
