@@ -357,10 +357,12 @@ checkPerm :: Maybe C.ByteString -> C.ByteString -> C.ByteString
              -> C.ByteString -> Bot Bool
 checkPerm channel nick prefix perm =
      do cfg <- ircConfig
-        let hasPerm perm = case lookup perm permRanks of
-                Just rank -> hasRank rank
-                Nothing -> anyPerm $! concat $! maybeToList
-                                   $! M.lookup perm (perms cfg)
+        let hasPerm perm =
+              case if C.length perm == 1 then C.head perm else ' ' of
+              '+' -> hasRank 1
+              '%' -> hasRank 2
+              '@' -> hasRank 3
+              _ -> anyPerm $! concat $! maybeToList $! M.lookup perm (perms cfg)
             anyPerm (perm:rest) =
              do ok <- case perm of
                       Client re -> return $! (matchOnce re prefix) /= Nothing
@@ -376,8 +378,6 @@ checkPerm channel nick prefix perm =
                 Just ch -> fmap (maybe False ((>= expectRank) . rank))
                                 (getUser ch nick)
         hasPerm perm
-  where permRanks = [(C.singleton '+', 1), (C.singleton '%', 2),
-                     (C.singleton '@', 3)]
 
 -- wrapper that encodes irc input into desired charset
 bot :: (C.ByteString, String, [C.ByteString]) -> Bot ()
