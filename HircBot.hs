@@ -565,22 +565,23 @@ initConfig !users !cfg =
                           Raw -> id,
             patterns = createPatterns cfg,
             aliasMap = aliasHash,
-            perms = foldr addPerm M.empty (permits cfg),
+            perms = M.fromList $! map getPerms (permits cfg),
             plugins = M.empty,
             users = users
         }
-  where addPerm (perm, users) = let perms = map getPerm users in
-                                M.alter (Just . maybe perms (perms ++)) perm
+  where getPerms (perm, users) = (perm, map getPerm users)
         getPerm user =
             if not (C.null user) && C.head user == ':' then Group (C.tail user)
-                else Client (makeRegex (permPattern user))
-        permPattern s = C.concat (C.singleton '^' : escapePerm s)
-        escapePerm = let tr (h, t) | C.null t = [h, C.singleton '$']
-                         tr (h, t) = h : (case C.head t of
-                                          '*' -> C.pack ".*"
-                                          '.' -> C.pack "\\."
-                                          _ -> C.empty) : escapePerm (C.tail t)
-                     in tr . C.break (\c -> c == '*' || c == '.')
+                else Client $! makeRegex $! permPattern user
+        permPattern s = C.concat $! C.singleton '^' : escapePerm s
+        escapePerm = tr . C.break (\c -> c == '*' || c == '.')
+        tr (!h, t) | C.null t = [h, C.singleton '$']
+        tr (h, t) = h : (case C.head t of
+                           '*' -> aster
+                           '.' -> dot
+                           _ -> C.empty) : escapePerm (C.tail t)
+        aster = C.pack ".*"
+        dot   = C.pack "\\."
 
 getConfig users = readConfig >>= initConfig users
 
