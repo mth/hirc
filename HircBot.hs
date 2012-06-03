@@ -173,20 +173,21 @@ lower = C.map toLower
 {-
  - HTTP
  -}
+httpGet :: String -> C.ByteString -> Int -> Regex
+                  -> ([C.ByteString] -> Bot ()) -> Bot ()
 httpGet uriStr body maxb re action =
      do uri <- maybe (fail $ "Bad URI: " ++ uriStr) return (parseURI uriStr)
         unlift <- escape
         let hdr = [H.Header H.HdrRange ("bytes=0-" ++ show maxb)]
-            rq = if body == "" then H.Request uri H.GET hdr ""
+            rq = if C.null body then H.Request uri H.GET hdr C.empty
                  else H.Request uri H.POST (H.Header H.HdrContentLength
-                                                (show $ length body):hdr) body
+                                                (show $ C.length body):hdr) body
         liftIO $ forkIO $ catch
             (do rsp <- H.simpleHTTP rq >>= either (fail . show) return
                 let code = H.rspCode rsp
                 when (code /= (2, 0, 0) && code /= (2,0,6)) (fail $ show $ code)
                 unlift $ maybe (putLog $! "HTTP NOMATCH: " ++ uriStr) action
-                               (matchRegex re $! C.take maxb $ C.pack
-                                                $ H.rspBody rsp))
+                               (matchRegex re $! C.take maxb $ H.rspBody rsp))
             (\e -> print $! "HTTP " ++ uriStr ++ ": " ++ show e)
         return ()
 
@@ -485,7 +486,7 @@ bot' msg@(prefix, cmd, args) =
                 execSys replyTo limit prg (map param args)
             Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
             Http uri body maxb pattern events ->
-                httpGet (C.unpack $ param uri) (C.unpack $ param body) maxb
+                httpGet (C.unpack $ param uri) (param body) maxb
                         pattern (\param ->
                            mapM_ (execute $ bindArg prefix $ from:param) events)
             Append file str -> liftIO $ C.appendFile file (param str)
