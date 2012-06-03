@@ -40,7 +40,7 @@ import System.Posix.Signals
 import System.Posix.Process
 import System.Posix.Types
 import System.IO
-import qualified Network.HTTP as H
+import qualified Network.HTTP as W
 import Network.URI
 
 data EncodingSpec = Utf8 | Latin1 | Raw
@@ -178,16 +178,16 @@ httpGet :: String -> C.ByteString -> Int -> Regex
 httpGet uriStr body maxb re action =
      do uri <- maybe (fail $ "Bad URI: " ++ uriStr) return (parseURI uriStr)
         unlift <- escape
-        let hdr = [H.Header H.HdrRange ("bytes=0-" ++ show maxb)]
-            rq = if C.null body then H.Request uri H.GET hdr C.empty
-                 else H.Request uri H.POST (H.Header H.HdrContentLength
+        let hdr = [W.Header W.HdrRange ("bytes=0-" ++ show maxb)]
+            rq = if C.null body then W.Request uri W.GET hdr C.empty
+                 else W.Request uri W.POST (W.Header W.HdrContentLength
                                                 (show $ C.length body):hdr) body
         liftIO $ forkIO $ catch
-            (do rsp <- H.simpleHTTP rq >>= either (fail . show) return
-                let code = H.rspCode rsp
+            (do rsp <- W.simpleHTTP rq >>= either (fail . show) return
+                let code = W.rspCode rsp
                 when (code /= (2, 0, 0) && code /= (2,0,6)) (fail $ show $ code)
                 unlift $ maybe (putLog $! "HTTP NOMATCH: " ++ uriStr) action
-                               (matchRegex re $! C.take maxb $ H.rspBody rsp))
+                               (matchRegex re $! C.take maxb $ W.rspBody rsp))
             (\e -> print $! "HTTP " ++ uriStr ++ ": " ++ show e)
         return ()
 
