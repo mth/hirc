@@ -81,6 +81,7 @@ lexer "" "" = []
 lexer a (' ':s) = next lexer a s
 lexer a ('(':s) = next (skip 0) a s
 lexer _ (')':_) = error "Mismatched)"
+lexer a (',':s) = lexer a ('.':s)
 lexer a@(t:_) (x:xs) | x /= '-' && kind t == kind x &&
                        (not (all isAlpha a) || isAlpha x) = lexer (x:a) xs
   where kind c = c == '.' || c == '~' || isAlphaNum c
