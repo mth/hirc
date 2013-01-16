@@ -30,6 +30,7 @@ import qualified Data.HashTable as H
 import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
+import Control.Exception as E
 import Text.Regex.Posix
 import System.Environment
 import System.Exit
@@ -37,7 +38,7 @@ import System.Time
 import System.Random
 import System.Posix.IO
 import System.Posix.Signals
-import System.Posix.Process
+import System.Posix.Process.ByteString
 import System.Posix.Types
 import System.IO
 import qualified Network.HTTP as W
@@ -51,8 +52,8 @@ data EventSpec =
     Say !C.ByteString | SayTo !C.ByteString !C.ByteString |
     Join !C.ByteString | Quit !C.ByteString | Perm !C.ByteString |
     IfPerm !C.ByteString [EventSpec] [EventSpec] | RandLine !String |
-    Exec !String [C.ByteString] | Plugin [String] !C.ByteString |
-    ExecMaxLines !Int String [C.ByteString] |
+    Exec !C.ByteString [C.ByteString] | Plugin [C.ByteString] !C.ByteString |
+    ExecMaxLines !Int !C.ByteString [C.ByteString] |
     Http !C.ByteString !C.ByteString !Int !Regex [EventSpec] |
     Calc !C.ByteString | Append !String !C.ByteString | Rehash |
     Call !C.ByteString [C.ByteString]
@@ -98,7 +99,7 @@ data ConfigItem =
     Permit !C.ByteString [C.ByteString] |
     NoPermit [EventSpec] deriving Read
 
-data PluginId = ExecPlugin [String]
+data PluginId = ExecPlugin [C.ByteString]
     deriving (Show, Eq, Ord)
 
 data PluginCmd = PluginMsg C.ByteString C.ByteString | KillPlugin
@@ -120,6 +121,9 @@ data ConfigSt = ConfigSt {
     users :: H.HashTable C.ByteString (M.Map C.ByteString User),
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
+
+ioCatch :: IO a -> (IOError -> IO a) -> IO a
+ioCatch = E.catch
 
 hashByteString s = H.hashInt (C.foldl' (\m c -> 31 * m + ord c) 0 s)
 
@@ -163,8 +167,8 @@ randLine fn =
                     return $! (before : a) !! n
                 else snippet (C.tail after) (before : a)
 
-dropPath p = if s == "" then p else dropPath (tail s)
-  where s = dropWhile (/= '/') p
+dropPath p = if C.null s then p else dropPath (C.tail s)
+  where s = C.dropWhile (/= '/') p
 
 putLog = liftIO . putStrLn
 cPutLog s l = liftIO $ C.putStrLn $ C.concat (C.pack s : l)
@@ -182,7 +186,7 @@ httpGet uriStr body maxb re action =
             rq = if C.null body then W.Request uri W.GET hdr C.empty
                  else W.Request uri W.POST (W.Header W.HdrContentLength
                                                 (show $ C.length body):hdr) body
-        liftIO $ forkIO $ catch
+        liftIO $ forkIO $ ioCatch
             (do rsp <- W.simpleHTTP rq >>= either (fail . show) return
                 let code = W.rspCode rsp
                 when (code /= (2, 0, 0) && code /= (2,0,6)) (fail $ show $ code)
@@ -194,7 +198,8 @@ httpGet uriStr body maxb re action =
 {-
  - EXEC
  -}
-sysProcess :: Maybe Fd -> String -> [String] -> IO (ProcessID, Handle)
+sysProcess :: Maybe Fd -> C.ByteString -> [C.ByteString]
+                       -> IO (ProcessID, Handle)
 sysProcess input prog argv =
      do (rd, wd) <- createPipe
         pid <- forkProcess (closeFd rd >> child wd)
@@ -202,7 +207,7 @@ sysProcess input prog argv =
         h <- fdToHandle rd
         hSetEncoding h latin1
         return (pid, h)
-  where tryClose fd = catch (closeFd fd) (const (return ()))
+  where tryClose fd = ioCatch (closeFd fd) (const (return ()))
         child wd =
          do dupTo wd stdOutput
             case input of
@@ -212,21 +217,21 @@ sysProcess input prog argv =
                                closeFd stdInput
             closeFd wd
             mapM_ (tryClose . toEnum) [3 .. 255]
-            catch (executeFile prog False argv Nothing)
-                  (\e -> when (input /= Nothing)
-                              (fdWrite stdError (show e ++ "\n") >> return ()))
+            ioCatch (executeFile prog False argv Nothing)
+                    (\e -> when (input /= Nothing)
+                               (fdWrite stdError (show e ++ "\n") >> return ()))
             fdWrite stdOutput "dead plugin walking"
             exitImmediately (ExitFailure 127)
 
 readInput :: Handle -> (C.ByteString -> IO Bool) -> IO () -> IO ()
-readInput h f cleanup = catch copy (\_ -> hClose h >> cleanup)
+readInput h f cleanup = ioCatch copy (\_ -> hClose h >> cleanup)
     where copy = C.hGetLine h >>= f >>= (`when` copy)
 
-execSys :: C.ByteString -> Int -> String -> [C.ByteString] -> Bot ()
+execSys :: C.ByteString -> Int -> C.ByteString -> [C.ByteString] -> Bot ()
 execSys to maxLines prog argv =
      do unlift <- escape
         let filter l n = let r = take n l in return (n - length r, r)
-        liftIO $ do (pid, h) <- sysProcess Nothing prog (map C.unpack argv)
+        liftIO $ do (pid, h) <- sysProcess Nothing prog argv
                     v <- newMVar maxLines
                     let sayN s = do
                          unlift $ say' (liftIO . modifyMVar v . filter) to s
@@ -242,7 +247,7 @@ execSys to maxLines prog argv =
         guard sayTo pid =
          do threadDelay 30000000
             kill softwareTermination pid $
-                 do sayTo (C.pack $ "Terminated " ++ dropPath prog)
+                 do sayTo (C.append (C.pack "Terminated ") (dropPath prog))
                     threadDelay 1000000
                     kill killProcess pid
                          (getProcessStatus True False pid >> return ())
@@ -389,7 +394,7 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
             kill = removePlugin id >>
                     liftIO (signalProcess softwareTermination pid)
             handler KillPlugin = kill
-            handler (PluginMsg replyTo msg) = liftIO $ catch
+            handler (PluginMsg replyTo msg) = liftIO $ ioCatch
                 (swapMVar to replyTo >> C.hPutStrLn inp msg)
                 (\e -> putStrLn (show id ++ ": " ++ show e) >>
                        unlift (kill >> say replyTo ghost))
@@ -597,8 +602,8 @@ main =
                 users <- H.new (==) hashByteString
                 config <- initConfig users cfg >>= newIORef
                 appendFile "seen.dat" "\n"
-                catch (connectIrc host port (nick cfg) bot config)
-                      (failed nth config)
+                ioCatch (connectIrc host port (nick cfg) bot config)
+                        (failed nth config)
         failed !nth !config ex =
              do putStrLn ("Reconnect after 1 min: Error occured: " ++ show ex)
                 threadDelay 60000000

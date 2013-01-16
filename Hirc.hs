@@ -169,7 +169,7 @@ connectIrc host port nick handler cfgRef =
         mainThread <- myThreadId
         threads <- sequence $ map forkIO [
             pinger ctx, pingChecker ctx mainThread, writer 1]
-        finally (E.catch (Prelude.catch (runReaderT run ctx) ioEx) ex)
+        finally (E.catch (E.catch (runReaderT run ctx) ioEx) ex)
                 (finally (runReaderT (handler (C.empty, "TERMINATE", [])) ctx)
                          (mapM_ killThread threads >> hClose h))
         putStrLn "Normal shutdown."
@@ -192,7 +192,7 @@ ircCatch action handler =
             ioEx e | isUserErrorType (ioeGetErrorType e) =
                 liftIrc $ handler (ioeGetErrorString e)
             ioEx e = ioError e
-        liftIO $ Prelude.catch (E.catch (liftIrc action) ex) ioEx
+        liftIO $ E.catch (E.catch (liftIrc action) ex) ioEx
 
 ircConfig :: Irc c c
 ircConfig = ask >>= liftIO . readIORef . config
