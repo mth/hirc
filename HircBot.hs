@@ -56,7 +56,7 @@ data EventSpec =
     ExecMaxLines !Int !C.ByteString [C.ByteString] |
     Http !C.ByteString !C.ByteString !Int !Regex [EventSpec] |
     Calc !C.ByteString | Append !String !C.ByteString | Rehash |
-    Call !C.ByteString [C.ByteString]
+    Call !C.ByteString [C.ByteString] | Next
     deriving Read
 
 data AllowSpec = Client !Regex | Group C.ByteString
@@ -454,9 +454,12 @@ bot' msg@(prefix, cmd, args) =
                             . M.lookup cmd . patterns) atErr
   where doMatch ((argPattern, events):rest) =
             if length args < length argPattern then doMatch rest
-            else maybe (doMatch rest)
-                  (\p -> mapM_ (execute $ bindArg prefix . (from:) . (++ [from])
-                                        $ concat p) events)
+            else maybe (doMatch rest) (\p -> do
+                    mapM_ (execute $ bindArg prefix . (from:) . (++ [from])
+                                   $ concat p) events
+                    let isNext Next = True
+                        isNext _ = False
+                    when (any isNext events) (doMatch rest))
                   (sequence $ zipWith matchRegex argPattern args)
         doMatch [] = do let what = last args
                         when (cmd == "PRIVMSG")
@@ -495,6 +498,7 @@ bot' msg@(prefix, cmd, args) =
                         pattern (\param ->
                            mapM_ (execute $ bindArg prefix $ from:param) events)
             Append file str -> liftIO $ C.appendFile file (param str)
+            Next -> return ()
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
         atErr str = putLog str >> ircSend from "NOTICE" [from, C.pack str]
