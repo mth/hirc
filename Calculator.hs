@@ -37,7 +37,8 @@ functions :: [(String, Double -> Double)]
 functions =
    [("abs", abs), ("acos", acos), ("asin", asin), ("atan", atan),
     ("sqrt", sqrt), ("cos", cos), ("sin", sin), ("tan", tan),
-    ("exp", exp), ("ln", log), ("log", logBase 10),
+    ("exp", exp), ("ln", log), ("log", logBase 10), ("log2", logBase 2),
+    ("ceil", fromIntegral . ceiling), ("floor", fromIntegral . floor),
     ("round", fromIntegral . round), ("int", fromIntegral . truncate),
     ("~", fromIntegral . (complement :: Integer -> Integer) . truncate)]
 
