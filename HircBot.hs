@@ -31,6 +31,8 @@ import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
 import Control.Exception as E
+import qualified Network.HTTP as W
+import Network.URI
 import Text.Regex.Posix
 import System.Environment
 import System.Exit
@@ -41,8 +43,6 @@ import System.Posix.Signals
 import System.Posix.Process.ByteString
 import System.Posix.Types
 import System.IO
-import qualified Network.HTTP as W
-import Network.URI
 
 data EncodingSpec = Utf8 | Latin1 | Raw
     deriving Read
