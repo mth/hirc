@@ -19,7 +19,8 @@ sub update {
 		} elsif (/<airtemperature>(.*)<\/airtemperature>/) {
 			$temp{$name} = $1;
 			$temp{Tartu} = $temp{$name} if $name =~ /^Tartu-T/;
-			push @parnu, $temp{$name} if $name_ =~ /P.rnu/;
+			push @parnu, $temp{$name}
+				 if $name_ =~ /P.rnu/ && $temp{$name} =~ /\d/;
 		}
 	}
 	if (@parnu) {
