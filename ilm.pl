@@ -5,7 +5,8 @@ sub http {
 }
 
 $last_update = 0;
-$emhi_url = 'http://213.184.50.180/ilma_andmed/xml/observations.php';
+#$emhi_url = 'http://213.184.50.180/ilma_andmed/xml/observations.php';
+$emhi_url = 'http://www.emhi.ee/ilma_andmed/xml/observations.php';
 
 sub update {
 	print STDERR "ilmauuendus $dt\n";
@@ -14,38 +15,55 @@ sub update {
 			$name = encode("UTF-8", $1);
 			$name =~ s/ *\([^)]*\)//;
 		} elsif (/<airtemperature>(.*)<\/airtemperature>/) {
-			$temp{$name} = $1
+			$temp{$name} = $1;
+			$temp{Tartu} = $temp{$name} if $name =~ /^Tartu-T/;
 		}
 	}
+	$temp{Tallinn} = $temp{'Tallinn-Harku'};
 	$_ = http(10, 'http://193.40.11.172/et/frontmain.php?m=2');
 	s/<[^>]*>/ /g;
-	$temp{Tartu} = $1 if / Temperatuur +(-?\d+(\.\d+)?) /;
+	if (/ Temperatuur +(-?\d+(\.\d+)?) /) {
+		my $tartu = $1;
+		my $tt = $temp{Tartu};
+		if (abs($tt - $tartu) < 4 or $tt !~ /\d/) {
+			$temp{Tartu} = $tartu;
+		} elsif (abs($tt - $tartu) <= 6) {
+			$temp{Tartu} = sprintf("%.1f", ($tt + $tartu) / 2);
+		}
+	}
 	#@tallinn = `/usr/bin/lynx -source http://weather.noaa.gov/pub/data/observations/metar/stations/EETN.TXT`;
 	#if ($tallinn[1] =~ / (M?)(\d\d)\/M?\d\d /) {
 	#	$tallinn = $1 ? -$2 : $2;
 	#}
 	#@tallinn_ = split(/[ ']/, `/bin/nc 193.40.240.131 6340`);
 	#if (@tallinn_ > 2) {
-	$tallinn = http(10, 'http://www.ilm.ee/~data/tallinn/temp');
+	my $tallinn = http(10, 'http://www.ilm.ee/~data/tallinn/temp');
 	chomp $tallinn;
 	if ($tallinn =~ /-?[\d.]+/ and
 			($tallinn ne '0.0' or $temp{Tallinn} !~ /\d/)) {
 		$tallinn = $&; # $tallinn_[2];
 		#$tallinn =~ tr/,/./;
-		if ($temp{Tallinn} =~ /\d/) {
-			$tallinn += $temp{Tallinn};
-			$tallinn = sprintf("%.1f", $tallinn / 2);
+		my $tt = $temp{Tallinn};
+		if ($tt =~ /\d/) {
+			if (abs($tt - $tallinn) <= 6) {
+				$tallinn += $tt * 2;
+				$tallinn = sprintf("%.1f", $tallinn / 3);
+			} else { # valetab, raisk.
+				$tallinn = $tt;
+			}
 		}
 		$temp{Tallinn} = $tallinn;
 		#$tartu = http(10, 'http://www.ilm.ee/~data/tartu/temp');
 		#$temp{Tartu} = $tartu if $tartu =~ /\d/;
 	}
-	($s,$m,$h) = localtime($last_update = time);
-	$m = sprintf "%02d", $m;
-	$ilm = "kell $h:$m";
+	#($s,$m,$h) = localtime($last_update = time);
+	#$m = sprintf "%02d", $m;
+	#$ilm = "kell $h:$m";
+	my @ilm;
 	for (qw(Tallinn Tartu Viljandi Keila Pärnu Võru)) {
-		$ilm = "$ilm; $_: $temp{$_}°C" if defined $temp{$_}
+		push @ilm, "$_: $temp{$_}°C" if defined $temp{$_}
 	}
+	$ilm = join '; ', @ilm;
 	$ilm =~ s/([0-9])\.([0-9])/\1,\2/sg;
 	$ilm =~ s/\n//sg;
 }
@@ -55,5 +73,5 @@ $| = 1;
 while (<STDIN>) {
 	$dt = time - $last_update;
 	&update if $dt > 60 * 10;
-	print "$ilm\n";
+	print "$ilm\n" if $ilm;
 }
