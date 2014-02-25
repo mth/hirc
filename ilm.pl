@@ -10,14 +10,22 @@ $emhi_url = 'http://www.emhi.ee/ilma_andmed/xml/observations.php';
 
 sub update {
 	print STDERR "ilmauuendus $dt\n";
+	my @parnu;
 	for (split /\n/s, http(40, $emhi_url)) {
 		if (/<name>(.*)<\/name>/) {
-			$name = encode("UTF-8", $1);
+			$name_ = $1;
+			$name = encode("UTF-8", $name_);
 			$name =~ s/ *\([^)]*\)//;
 		} elsif (/<airtemperature>(.*)<\/airtemperature>/) {
 			$temp{$name} = $1;
 			$temp{Tartu} = $temp{$name} if $name =~ /^Tartu-T/;
+			push @parnu, $temp{$name} if $name_ =~ /P.rnu/;
 		}
+	}
+	if (@parnu) {
+		my $parnu = 0;
+		$parnu += $_ for @parnu;
+		$temp{'Pärnu'} = $parnu / @parnu;
 	}
 	$temp{Tallinn} = $temp{'Tallinn-Harku'};
 	$_ = http(10, 'http://193.40.11.172/et/frontmain.php?m=2');
