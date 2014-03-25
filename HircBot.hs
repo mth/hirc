@@ -26,7 +26,6 @@ import Data.IORef
 import Data.Maybe
 import Data.List
 import qualified Data.Map as M
-import qualified Data.HashTable as H
 import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
@@ -118,14 +117,12 @@ data ConfigSt = ConfigSt {
     aliasMap :: M.Map C.ByteString [EventSpec],
     perms :: M.Map C.ByteString [AllowSpec],
     -- Map nick (Map channel User)
-    users :: H.HashTable C.ByteString (M.Map C.ByteString User),
+    users :: M.Map C.ByteString (M.Map C.ByteString User),
     plugins :: M.Map PluginId (PluginCmd -> Bot ())
 }
 
 ioCatch :: IO a -> (IOError -> IO a) -> IO a
 ioCatch = E.catch
-
-hashByteString s = H.hashInt (C.foldl' (\m c -> 31 * m + ord c) 0 s)
 
 matchRegex :: Regex -> C.ByteString -> Maybe [C.ByteString]
 matchRegex re value =
@@ -257,9 +254,7 @@ execSys to maxLines prog argv =
  -}
 getUserMap :: C.ByteString -> Bot (M.Map C.ByteString User)
 getUserMap nick =
-     do cfg <- ircConfig
-        res <- liftIO $ H.lookup (users cfg) (lower nick)
-        return $! fromMaybe M.empty res
+    fmap (fromMaybe M.empty . M.lookup (lower nick) . users) ircConfig
 
 getUser :: C.ByteString -> C.ByteString -> Bot (Maybe User)
 getUser channel nick =
@@ -268,11 +263,11 @@ getUser channel nick =
 updateUserMap :: (M.Map C.ByteString User -> M.Map C.ByteString User)
                     -> C.ByteString -> Bot ()
 updateUserMap f nick =
-     do t <- fmap users ircConfig
-        !m <- fmap (f . fromMaybe M.empty) $ liftIO $ H.lookup t k
-        liftIO (if M.null m then H.delete t k
-                            else H.update t k m >> return ())
- where k = lower nick
+    do cfg <- ircConfig
+       let !users' = M.alter update (lower nick) (users cfg)
+       ircSetConfig cfg { users = users' }
+ where update user = let m = f (fromMaybe M.empty user) in
+                     if M.null m then Nothing else Just m
 
 updateUser :: (Maybe User -> Maybe User)
                 -> C.ByteString -> C.ByteString -> Bot ()
@@ -601,8 +596,7 @@ main =
   where connect !nth !cfg =
              do let servers' = servers cfg
                     (host, port) = servers' !! (nth `mod` length servers')
-                users <- H.new (==) hashByteString
-                config <- initConfig users cfg >>= newIORef
+                config <- initConfig M.empty cfg >>= newIORef
                 appendFile "seen.dat" "\n"
                 ioCatch (connectIrc host port (nick cfg) bot config)
                         (failed nth config)
