@@ -266,7 +266,7 @@ updateUserMap f nick =
     do cfg <- ircConfig
        let !users' = M.alter update (lower nick) (users cfg)
        ircSetConfig cfg { users = users' }
- where update user = let m = f (fromMaybe M.empty user) in
+ where update user = let !m = f (fromMaybe M.empty user) in
                      if M.null m then Nothing else Just m
 
 updateUser :: (Maybe User -> Maybe User)
