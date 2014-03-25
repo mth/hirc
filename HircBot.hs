@@ -115,7 +115,7 @@ data ConfigSt = ConfigSt {
     raw :: !Config,
     encodeInput :: String -> String,
     patterns :: !ConfigPatterns,
-    aliasMap :: H.HashTable C.ByteString [EventSpec],
+    aliasMap :: M.Map C.ByteString [EventSpec],
     perms :: M.Map C.ByteString [AllowSpec],
     -- Map nick (Map channel User)
     users :: H.HashTable C.ByteString (M.Map C.ByteString User),
@@ -474,8 +474,8 @@ bot' msg@(prefix, cmd, args) =
             Call alias args ->
                 let exec = execute (if null args then param else
                                         bindArg prefix (from:map param args)) in
-                ircConfig >>= liftIO . (`H.lookup` alias) . aliasMap >>=
-                maybe (error (C.unpack alias ++ " undefined")) (mapM_ exec)
+                ircConfig >>= maybe (error (C.unpack alias ++ " undefined"))
+                                    (mapM_ exec) . M.lookup alias . aliasMap
             Perm perm     -> do ok <- checkPerm channel from prefix perm
                                 unless ok (fail "NOPERM")
             IfPerm perm events evElse ->
@@ -565,16 +565,14 @@ readConfig =
         }
 
 initConfig !users !cfg =
-     do aliasHash <- H.new (==) hashByteString
-        mapM_ (\(k, v) -> H.update aliasHash k v) (define cfg)
-        return $! ConfigSt {
+     do return $! ConfigSt {
             raw = cfg,
             encodeInput = case encoding cfg of
                           Utf8 -> utf8Encode
                           Latin1 -> utf8Decode
                           Raw -> id,
             patterns = createPatterns cfg,
-            aliasMap = aliasHash,
+            aliasMap = M.fromList (define cfg),
             perms = foldr addPerm M.empty (permits cfg),
             plugins = M.empty,
             users = users
