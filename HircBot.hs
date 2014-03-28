@@ -22,7 +22,6 @@ import Utf8Conv
 import Calculator
 import Data.Array (elems)
 import Data.Char
-import Data.IORef
 import Data.Maybe
 import Data.List
 import qualified Data.Map as M
@@ -263,11 +262,11 @@ getUser channel nick =
 updateUserMap :: (M.Map C.ByteString User -> M.Map C.ByteString User)
                     -> C.ByteString -> Bot ()
 updateUserMap f nick =
-    do cfg <- ircConfig
-       let !users' = M.alter update (lower nick) (users cfg)
-       ircSetConfig cfg { users = users' }
- where update user = let !m = f (fromMaybe M.empty user) in
-                     if M.null m then Nothing else Just m
+    ircModifyConfig $ \cfg ->
+        let !users' = M.alter update (lower nick) (users cfg) in
+        return cfg { users = users' }
+  where update user = let !m = f (fromMaybe M.empty user) in
+                      if M.null m then Nothing else Just m
 
 updateUser :: (Maybe User -> Maybe User)
                 -> C.ByteString -> C.ByteString -> Bot ()
@@ -363,8 +362,8 @@ seenEvent _ _ _ = return ()
  - PLUGIN
  -}
 removePlugin id =
-     do cfg <- ircConfig
-        ircSetConfig cfg { plugins = M.delete id (plugins cfg) }
+    ircModifyConfig $ \cfg ->
+        return cfg { plugins = M.delete id (plugins cfg) }
 
 killPlugins = ircConfig >>= mapM_ ($! KillPlugin) . M.elems . plugins
 
@@ -403,8 +402,8 @@ invokePlugin :: PluginId -> C.ByteString -> C.ByteString -> Bot ()
 invokePlugin id to msg =
     ircConfig >>= maybe start ($! PluginMsg to msg) . M.lookup id . plugins
   where start = do p <- startPlugin id to
-                   cfg <- ircConfig
-                   ircSetConfig cfg { plugins = M.insert id p (plugins cfg) }
+                   ircModifyConfig $ \cfg ->
+                        return cfg { plugins = M.insert id p (plugins cfg) }
                    p (PluginMsg to msg)
 {-
  - CORE
@@ -482,8 +481,7 @@ bot' msg@(prefix, cmd, args) =
             Calc text     ->
                 let reply' = reply . C.pack in
                 ircCatch (reply' $ calc $ C.unpack $ param text) reply'
-            Rehash        -> killPlugins >>
-                ircConfig >>= liftIO . getConfig . users >>= ircSetConfig
+            Rehash        -> killPlugins >> ircModifyConfig (getConfig . users)
             Exec prg args -> execSys replyTo 50 prg (map param args)
             ExecMaxLines limit prg args ->
                 execSys replyTo limit prg (map param args)
@@ -596,7 +594,7 @@ main =
   where connect !nth !cfg =
              do let servers' = servers cfg
                     (host, port) = servers' !! (nth `mod` length servers')
-                config <- initConfig M.empty cfg >>= newIORef
+                config <- initConfig M.empty cfg >>= newMVar
                 appendFile "seen.dat" "\n"
                 ioCatch (connectIrc host port (nick cfg) bot config)
                         (failed nth config)
@@ -604,4 +602,4 @@ main =
              do putStrLn ("Reconnect after 1 min: Error occured: " ++ show ex)
                 threadDelay 60000000
                 putStrLn "Reconnecting..."
-                readIORef config >>= connect (nth + 1) . raw
+                readMVar config >>= connect (nth + 1) . raw

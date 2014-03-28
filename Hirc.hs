@@ -19,7 +19,7 @@
  -}
 module Hirc (
     Irc, showMsg, ircSend, ircCmd, say, say', quitIrc, connectIrc,
-    escape, ircCatch, liftIO, ircConfig, ircSetConfig, myIrcNick, splitN,
+    escape, ircCatch, liftIO, ircConfig, ircModifyConfig, myIrcNick, splitN,
     initEnv
 ) where
 
@@ -39,7 +39,7 @@ import System.Random
 
 data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [C.ByteString],
-                         config :: IORef c,
+                         config :: MVar c,
                          currentNick :: IORef C.ByteString,
                          isQuit :: IORef Bool }
 type Irc c a = ReaderT (IrcCtx c) IO a
@@ -146,7 +146,7 @@ processIrc handler = run wait
 
 connectIrc :: Integral a => String -> a -> String
                          -> ((C.ByteString, String, [C.ByteString]) -> Irc c ())
-                         -> IORef c -> IO ()
+                         -> MVar c -> IO ()
 connectIrc host port nick handler cfgRef =
      do h <- connectTo host (PortNumber $ fromIntegral port)
         hSetEncoding h latin1
@@ -195,10 +195,10 @@ ircCatch action handler =
         liftIO $ E.catch (E.catch (liftIrc action) ex) ioEx
 
 ircConfig :: Irc c c
-ircConfig = ask >>= liftIO . readIORef . config
+ircConfig = ask >>= liftIO . readMVar . config
 
-ircSetConfig :: c -> Irc c ()
-ircSetConfig !cfg = ask >>= liftIO . (`writeIORef` cfg) . config
+ircModifyConfig :: (c -> IO c) -> Irc c ()
+ircModifyConfig f = ask >>= liftIO . (`modifyMVar_` f) . config
 
 myIrcNick :: Irc c C.ByteString
 myIrcNick = ask >>= liftIO . readIORef . currentNick
