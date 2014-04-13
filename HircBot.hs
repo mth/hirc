@@ -198,7 +198,8 @@ sysProcess :: Maybe Fd -> C.ByteString -> [C.ByteString]
                        -> IO (ProcessID, Handle)
 sysProcess input prog argv =
      do (rd, wd) <- createPipe
-        pid <- forkProcess (closeFd rd >> child wd)
+        pid <- forkProcess (finally (closeFd rd >> child wd)
+                                    (exitImmediately (ExitFailure 127)))
         closeFd wd
         h <- fdToHandle rd
         hSetEncoding h latin1
@@ -217,7 +218,7 @@ sysProcess input prog argv =
                     (\e -> when (input /= Nothing)
                                (fdWrite stdError (show e ++ "\n") >> return ()))
             fdWrite stdOutput "dead plugin walking"
-            exitImmediately (ExitFailure 127)
+            return ()
 
 readInput :: Handle -> (C.ByteString -> IO Bool) -> IO () -> IO ()
 readInput h f cleanup = ioCatch copy (\_ -> hClose h >> cleanup)
