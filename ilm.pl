@@ -6,11 +6,13 @@ sub http {
 
 $last_update = 0;
 #$emhi_url = 'http://213.184.50.180/ilma_andmed/xml/observations.php';
-$emhi_url = 'http://www.emhi.ee/ilma_andmed/xml/observations.php';
+$emhi_url = 'http://www.ilmateenistus.ee/ilma_andmed/xml/observations.php';
 
 sub update {
 	print STDERR "ilmauuendus $dt\n";
 	my @parnu;
+	my %temp;
+	my $name;
 	for (split /\n/s, http(40, $emhi_url)) {
 		if (/<name>(.*)<\/name>/) {
 			$name_ = $1;
@@ -19,6 +21,7 @@ sub update {
 		} elsif (/<airtemperature>(.*)<\/airtemperature>/) {
 			$temp{$name} = $1;
 			$temp{Tartu} = $temp{$name} if $name =~ /^Tartu-T/;
+			$temp{Tallinn} = $temp{$name} if $name eq 'Tallinn-Harku';
 			push @parnu, $temp{$name}
 				 if $name_ =~ /P.rnu/ && $temp{$name} =~ /\d/;
 		}
@@ -28,8 +31,7 @@ sub update {
 		$parnu += $_ for @parnu;
 		$temp{'Pärnu'} = $parnu / @parnu;
 	}
-	$temp{Tallinn} = $temp{'Tallinn-Harku'};
-	$_ = http(10, 'http://193.40.11.172/et/frontmain.php?m=2');
+	$_ = http(10, 'http://meteo.physic.ut.ee/et/frontmain.php?m=2');
 	s/<[^>]*>/ /g;
 	if (/ Temperatuur +(-?\d+(\.\d+)?) /) {
 		my $tartu = $1;
