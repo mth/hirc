@@ -24,6 +24,7 @@ import Data.Array (elems)
 import Data.Char
 import Data.Maybe
 import Data.List
+import Data.UnixTime
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as C
 import Control.Monad
@@ -130,19 +131,30 @@ matchRegex re value =
             C.take len (C.drop start value) : collect rest
         collect [] = []
 
-bindArg :: C.ByteString -> [C.ByteString] -> C.ByteString -> C.ByteString
-bindArg prefix bindings str = C.concat $! format str
+bindArg :: C.ByteString -> [C.ByteString] -> C.ByteString -> Bot C.ByteString
+bindArg prefix bindings str = fmap C.concat $ mapM id (format str)
   where format str =
             let (start, rest) = C.span (/= '$') str in
             if C.null rest then
-                [start]
+                [return start]
             else let !rest' = C.tail rest in
-                if not (C.null rest') && C.head rest' == ':' then
-                    start : prefix : format (C.tail rest')
-                else case C.readInt rest' of
-                    Just (i, r) | i >= 0 && i < length bindings ->
-                        start : (bindings!!i) : format r
-                    _ -> start : C.singleton '$' : format rest'
+                if C.null rest' then
+                    [return start, return rest]
+                else case (C.head rest', C.span (/= '}') (C.tail rest')) of
+                    (':', _) ->
+                        return start : return prefix : format (C.tail rest')
+                    ('{', (v, t)) | not (C.null t) ->
+                        let ftail = format t in
+                        case map C.unpack $ C.words v of
+                            "time" : _ ->
+                                liftIO (getUnixTime >>=
+                                            formatUnixTime (C.drop 5 v)) : ftail
+                            _ -> return start : dollar : format rest'
+                    _ -> case C.readInt rest' of
+                        Just (i, r) | i >= 0 && i < length bindings ->
+                            return start : return (bindings!!i) : format r
+                        _ -> return start : dollar : format rest'
+        dollar = return $! C.singleton '$'
 
 randLine :: String -> IO C.ByteString
 randLine fn =
@@ -450,8 +462,8 @@ bot' msg@(prefix, cmd, args) =
   where doMatch ((argPattern, events):rest) =
             if length args < length argPattern then doMatch rest
             else maybe (doMatch rest) (\p -> do
-                    mapM_ (execute $ bindArg prefix . (from:) . (++ [from])
-                                   $ concat p) events
+                    param <- bindArg prefix (from : (concat p) ++ [from])
+                    mapM_ (execute param) events
                     let isNext Next = True
                         isNext _ = False
                     when (any isNext events) (doMatch rest))

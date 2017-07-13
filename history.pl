@@ -9,8 +9,8 @@ $len = length $key;
 my $exists;
 while (<F>) {
 	if ($key eq lc (substr $_, 0, $len)) {
-		split /\t/;
-		print $_[2] if $_[2] =~ /\S/;
+		my @x = split /\t/;
+		print $x[2] if $x[2] =~ /\S/;
 		$exists = 1
 	}
 }
