@@ -43,6 +43,7 @@ data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          currentNick :: IORef C.ByteString,
                          isQuit :: IORef Bool }
 type Irc c a = ReaderT (IrcCtx c) IO a
+type Message = (C.ByteString, String, [C.ByteString])
 
 foreign import ccall "hirc_init_env" initEnv :: IO ()
 
@@ -50,25 +51,27 @@ space = C.singleton ' '
 colon = C.singleton ':'
 spaceColon = C.pack " :"
 
-showMsg :: (C.ByteString, String, [C.ByteString]) -> C.ByteString
+showMsg :: Message -> C.ByteString
 showMsg (prefix, cmd, arg) =
     if C.null prefix then
         C.pack cmd `C.append` showArg arg
     else
         C.concat [colon, prefix, C.pack (' ':cmd), showArg arg]
 
+showArg :: [C.ByteString] -> C.ByteString
 showArg args = C.concat (format args)
   where format [] = []
         format [arg] = [spaceColon, arg]
         format (arg : rest) = space : arg : format rest
 
+stripCR :: C.ByteString -> C.ByteString
 stripCR str =
     if not (C.null str) && C.last str == '\r' then
         C.take (C.length str - 1) str
     else
         str
 
-readMsg :: (Monad m) => C.ByteString -> m (C.ByteString, String, [C.ByteString])
+readMsg :: (Monad m) => C.ByteString -> m Message
 readMsg message =
     if args == [] then fail ("Invalid irc message: " ++ show message)
                   else return $! (prefix, C.unpack (head args),
@@ -89,8 +92,10 @@ ircSend prefix cmd arg =
                 hPutStr h "\r\n"
                 hFlush h
 
+ircCmd :: String -> C.ByteString -> Irc c ()
 ircCmd cmd what = ircSend C.empty cmd [what]
 
+smartSplit :: Int -> C.ByteString -> (C.ByteString, C.ByteString)
 smartSplit at s =
     if C.null c || C.null rb' then (a, c)
                               else (C.reverse rb', C.append (C.reverse ra) c)
@@ -98,11 +103,19 @@ smartSplit at s =
         (ra, rb) = C.span (/= ' ') (C.reverse a)
         rb' = C.dropWhile (== ' ') rb
 
+splitN :: Int -> C.ByteString -> [C.ByteString]
 splitN n = takeWhile (not . C.null) . unfoldr (Just . smartSplit n)
 
-say' limit !to text = limit (splitN 400 text) >>= mapM_ msg
-  where msg !line = ask >>= liftIO . (`writeChan` [to, line]) . buffer
+say' :: ([C.ByteString] -> Irc c [C.ByteString])
+            -> C.ByteString -> C.ByteString -> Irc c ()
+say' limit !to text =
+    do lines <- limit (splitN 400 text)
+       ctx <- ask
+       let msg :: C.ByteString -> Irc c ()
+           msg !line = liftIO $ writeChan (buffer ctx) [to, line]
+       mapM_ msg lines
 
+say :: C.ByteString -> C.ByteString -> Irc c ()
 say to text = say' return to text
 
 quitIrc :: C.ByteString -> Irc c ()
@@ -113,11 +126,13 @@ quitIrc quitMsg =
 
 alive = C.pack "alive"
 
+pinger :: IrcCtx c -> IO ()
 pinger ctx = run
   where run = do threadDelay (1000 * 1000 * 120)
                  runReaderT (ircCmd "PING" alive) ctx
                  run
 
+pingChecker :: IrcCtx c -> ThreadId -> IO ()
 pingChecker ctx th = run
   where run = do threadDelay 10000000
                  performGC -- just force GC on every 10 seconds
@@ -125,13 +140,18 @@ pingChecker ctx th = run
                  if n >= 300 then throwTo th (ErrorCall "ping timeout") else run
         update x = let y = x + 10 in return $! (y, y)
 
-processIrc handler = run wait
-  where run p = ask >>= liftIO . C.hGetLine . conn >>= readMsg >>= p
+processIrc :: (Message -> Irc c ()) -> Irc c ()
+processIrc handler = do
+    ctx <- ask
+    let run p = do line <- liftIO $ C.hGetLine (conn ctx)
+                   msg <- readMsg line
+                   p msg
         process _ (_, "PING", param) = ircSend C.empty "PONG" param
-        process _ (_, "PONG", _) =
-            ask >>= liftIO . (`swapMVar` 0) . lastPong >> return ()
+        process _ (_, "PONG", _) = do liftIO $ swapMVar (lastPong ctx) 0
+                                      return ()
         process h msg@(_, cmd, !nick:_) | cmd == "NICK" || cmd == "001" =
-            ask >>= liftIO . (`writeIORef` nick) . currentNick >> h msg
+             do liftIO $ writeIORef (currentNick ctx) nick
+                h msg
         process h msg  = h msg
         wait (_, "376", _) = handler (C.empty, "CONNECTED", []) >> run ready
         wait (_, "432", _) = liftIO $ fail "Invalid nick"
@@ -143,9 +163,11 @@ processIrc handler = run wait
                 run wait
         wait msg = process (const (return ())) msg >> run wait
         ready msg = process handler msg >> run ready
+        result = run wait
+    result
 
 connectIrc :: Integral a => String -> a -> String
-                         -> ((C.ByteString, String, [C.ByteString]) -> Irc c ())
+                         -> (Message -> Irc c ())
                          -> MVar c -> IO ()
 connectIrc host port nick handler cfgRef =
      do h <- connectTo host (PortNumber $ fromIntegral port)
