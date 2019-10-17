@@ -1,6 +1,6 @@
 {-
  - Lowlevel IRC client library for HircBot.
- - Copyright (C) 2008-2011  Madis Janson
+ - Copyright (C) 2008-2019  Madis Janson
  -
  - This file is part of HircBot.
  - 
