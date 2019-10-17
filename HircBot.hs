@@ -462,7 +462,7 @@ bot' msg@(prefix, cmd, args) =
   where doMatch ((argPattern, events):rest) =
             if length args < length argPattern then doMatch rest
             else maybe (doMatch rest) (\p -> do
-                    param <- bindArg prefix (from : (concat p) ++ [from])
+                    let param = bindArg prefix (from : (concat p) ++ [from])
                     mapM_ (execute param) events
                     let isNext Next = True
                         isNext _ = False
@@ -473,14 +473,18 @@ bot' msg@(prefix, cmd, args) =
                              (seenMsg channel from $! what)
                         when (args /= [] && C.isPrefixOf (C.singleton '!') what)
                              (cPutLog "NOMATCH " [showMsg msg])
+        execute :: (C.ByteString -> Bot C.ByteString) -> EventSpec -> Bot ()
         execute param event =
             case event of
-            Send evCmd evArg -> ircSend C.empty evCmd (map param evArg)
-            Say text      -> mapM_ reply (C.lines $ param text)
-            SayTo to text -> mapM_ (say $ param to) (C.lines $ param text)
+            Send evCmd evArg -> mapM param evArg >>= ircSend C.empty evCmd
+            Say text      -> param text >>= mapM_ reply . C.lines
+            SayTo to text -> do to' <- param to
+                                param text >>= mapM_ (say to') . C.lines
             Call alias args ->
-                let exec = execute (if null args then param else
-                                        bindArg prefix (from:map param args)) in
+                let exec event =
+                        if null args then execute param event else
+                            do args' <- mapM param args
+                               execute (bindArg prefix (from : args')) event in
                 ircConfig >>= maybe (error (C.unpack alias ++ " undefined"))
                                     (mapM_ exec) . M.lookup alias . aliasMap
             Perm perm     -> do ok <- checkPerm channel from prefix perm
@@ -488,22 +492,26 @@ bot' msg@(prefix, cmd, args) =
             IfPerm perm events evElse ->
                  do ok <- checkPerm channel from prefix perm
                     mapM_ (execute param) (if ok then events else evElse)
-            Join channel  -> ircSend C.empty "JOIN" [param channel]
-            Quit msg      -> quitIrc (param msg)
-            RandLine fn   -> liftIO (randLine fn) >>= reply . param
-            Calc text     ->
-                let reply' = reply . C.pack in
-                ircCatch (reply' $ calc $ C.unpack $ param text) reply'
+            Join channel  -> do ch <- param channel
+                                ircSend C.empty "JOIN" [ch]
+            Quit msg      -> param msg >>= quitIrc
+            RandLine fn   -> liftIO (randLine fn) >>= param >>= reply
+            Calc text     -> do
+                let reply' = reply . C.pack
+                textParam <- param text
+                ircCatch (reply' $ calc $ C.unpack $ textParam) reply'
             Rehash        -> killPlugins >> ircModifyConfig (getConfig . users)
-            Exec prg args -> execSys replyTo 50 prg (map param args)
+            Exec prg args -> mapM param args >>= execSys replyTo 50 prg
             ExecMaxLines limit prg args ->
-                execSys replyTo limit prg (map param args)
-            Plugin prg cmd -> invokePlugin (ExecPlugin prg) replyTo (param cmd)
+                mapM param args >>= execSys replyTo limit prg
+            Plugin prg cmd -> param cmd >>= invokePlugin (ExecPlugin prg) replyTo
             Http uri body maxb pattern events ->
-                httpGet (C.unpack $ param uri) (param body) maxb
-                        pattern (\param ->
-                           mapM_ (execute $ bindArg prefix $ from:param) events)
-            Append file str -> liftIO $ C.appendFile file (param str)
+                do uri' <- param uri
+                   body' <- param body
+                   httpGet (C.unpack uri') body' maxb pattern
+                           (\param -> mapM_ (execute $ bindArg prefix
+                                                     $ from:param) events)
+            Append file str -> param str >>= liftIO . C.appendFile file
             Next -> return ()
         atErr "NOPERM" = ircConfig >>=
                 mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
