@@ -170,7 +170,7 @@ my %modify = (
 		if ($old) {
 			def_key("Uuendasin $_[0]", $key, "$old | $val", $loser);
 		} else {
-			print "Ma ei mäleta enam, mis $_[0] on.\n"
+			print "Ma ei mäleta enam, mis $_[0] on. Uute terminite jaoks on !learn.\n"
 		}
 	}
 );
