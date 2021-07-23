@@ -9,7 +9,7 @@ sub http {
 
 $last_update = 0;
 #$emhi_url = 'http://213.184.50.180/ilma_andmed/xml/observations.php';
-$emhi_url = 'https://www.ilmateenistus.ee/ilma_andmed/xml/observations.php';
+$emhi_url = 'http://www.ilmateenistus.ee/ilma_andmed/xml/observations.php';
 
 sub update {
 	print STDERR "ilmauuendus $dt\n";
