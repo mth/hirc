@@ -171,6 +171,7 @@ connectIrc :: String -> Int -> String -> (Message -> Irc c ())
 connectIrc host port nick handler cfgRef =
     withSocketsDo $ withConnection $ \h -> do 
         hSetEncoding h latin1
+        hSetBuffering h (BlockBuffering (Just 8192))
         lastPong <- newMVar 0
         sync <- newMVar ()
         buf <- newChan
@@ -198,11 +199,11 @@ connectIrc host port nick handler cfgRef =
           let hints = defaultHints { addrSocketType = Stream }
           addrInfo <- getAddrInfo (Just hints) (Just host) (Just (show port))
           let addr = head addrInfo
-          E.bracket (socket (addrFamily addr) (addrSocketType addr)
-                            (addrProtocol addr)) close $ \sock -> do
+          sock <- E.bracketOnError (socket (addrFamily addr) (addrSocketType addr)
+                                   (addrProtocol addr)) close $ \sock -> do
             connect sock $ addrAddress addr
-            h <- socketToHandle sock ReadWriteMode
-            client h
+            return sock
+          E.bracket (socketToHandle sock ReadWriteMode) hClose client
         run = do user <- liftIO $ getEnv "USER"
                  ircCmd "NICK" cnick
                  ircSend C.empty "USER"
