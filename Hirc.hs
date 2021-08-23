@@ -30,7 +30,7 @@ import Control.Monad.Reader
 import qualified Data.ByteString.Char8 as C
 import Data.IORef
 import Data.List
-import Network
+import Network.Socket
 import System.IO
 import System.IO.Error (ioeGetErrorString, ioeGetErrorType, isUserErrorType)
 import System.Environment
@@ -71,7 +71,7 @@ stripCR str =
     else
         str
 
-readMsg :: (Monad m) => C.ByteString -> m Message
+readMsg :: (MonadFail m) => C.ByteString -> m Message
 readMsg message =
     if args == [] then fail ("Invalid irc message: " ++ show message)
                   else return $! (prefix, C.unpack (head args),
@@ -166,11 +166,10 @@ processIrc handler = do
         result = run wait
     result
 
-connectIrc :: Integral a => String -> a -> String
-                         -> (Message -> Irc c ())
-                         -> MVar c -> IO ()
+connectIrc :: String -> Int -> String -> (Message -> Irc c ())
+                     -> MVar c -> IO ()
 connectIrc host port nick handler cfgRef =
-     do h <- connectTo host (PortNumber $ fromIntegral port)
+    withSocketsDo $ withConnection $ \h -> do 
         hSetEncoding h latin1
         lastPong <- newMVar 0
         sync <- newMVar ()
@@ -193,9 +192,18 @@ connectIrc host port nick handler cfgRef =
             pinger ctx, pingChecker ctx mainThread, writer 1]
         finally (E.catch (E.catch (runReaderT run ctx) ioEx) ex)
                 (finally (runReaderT (handler (C.empty, "TERMINATE", [])) ctx)
-                         (mapM_ killThread threads >> hClose h))
+                         (mapM_ killThread threads))
         putStrLn "Normal shutdown."
-  where run = do user <- liftIO $ getEnv "USER"
+  where withConnection client = do
+          let hints = defaultHints { addrSocketType = Stream }
+          addrInfo <- getAddrInfo (Just hints) (Just host) (Just (show port))
+          let addr = head addrInfo
+          E.bracket (socket (addrFamily addr) (addrSocketType addr)
+                            (addrProtocol addr)) close $ \sock -> do
+            connect sock $ addrAddress addr
+            h <- socketToHandle sock ReadWriteMode
+            client h
+        run = do user <- liftIO $ getEnv "USER"
                  ircCmd "NICK" cnick
                  ircSend C.empty "USER"
                          (map C.pack [user, "localhost", "unknown"] ++ [cnick])
