@@ -171,7 +171,7 @@ connectIrc :: String -> Int -> String -> (Message -> Irc c ())
 connectIrc host port nick handler cfgRef =
     withSocketsDo $ withConnection $ \h -> do 
         hSetEncoding h latin1
-        hSetBuffering h (BlockBuffering (Just 8192))
+        hSetBuffering h (BlockBuffering (Just 4096))
         lastPong <- newMVar 0
         sync <- newMVar ()
         buf <- newChan
