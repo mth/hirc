@@ -37,7 +37,7 @@ import System.Environment
 import System.Mem
 import System.Random
 
-data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
+data IrcCtx c = IrcCtx { conn :: !Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [C.ByteString],
                          config :: MVar c,
                          currentNick :: IORef C.ByteString,
@@ -130,12 +130,12 @@ pinger :: IrcCtx c -> IO ()
 pinger ctx = run
   where run = do threadDelay (1000 * 1000 * 120)
                  runReaderT (ircCmd "PING" alive) ctx
+                 performGC -- just force GC on every 2 minutes
                  run
 
 pingChecker :: IrcCtx c -> ThreadId -> IO ()
 pingChecker ctx th = run
   where run = do threadDelay 10000000
-                 performGC -- just force GC on every 10 seconds
                  n <- modifyMVar (lastPong ctx) update
                  if n >= 300 then throwTo th (ErrorCall "ping timeout") else run
         update x = let y = x + 10 in return $! (y, y)
