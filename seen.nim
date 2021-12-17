@@ -1,7 +1,4 @@
-import strutils
-import os
-import posix
-import tables
+import std/[strutils, os, posix, tables, times]
 
 let who = paramStr(1)
 let nick = paramStr(2)
@@ -63,5 +60,23 @@ if r == []:
 elif r[1].startsWith '+':
     echo r[0] & " on praegu kanalil"
 else:
-    echo r[0] & " oli siin kunagi"
-
+    let diff = toInt(epochTime() - r[1].parseFloat)
+    var t = abs diff
+    let s = t mod 60
+    t = t div 60
+    let m = t mod 60
+    t = t div 60
+    let h = t mod 24
+    t = t div 24 * 400
+    let d = t mod 146097 div 400
+    let y = t div 146097
+    var msg = r[0] & " oli siin "
+    if y != 0: msg &= $y & "a "
+    if d != 0: msg &= $d & "p "
+    if h != 0: msg &= $h & "t "
+    if m != 0: msg &= $m & "m "
+    if y == 0: msg &= $s & "s "
+    if diff >= 0: msg &= "tagasi"
+    else: msg &= "pärast"
+    if r[2] != "": msg &= " ja ütles: " & r[2]
+    echo msg
