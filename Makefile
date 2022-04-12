@@ -29,7 +29,7 @@ acrogrep: acrogrep.c
 	cc -o $@ -W -O2 $+
 
 seen: seen.nim
-	nim c -d:release --gc:none seen.nim
+	nim c -d:release --gc:none --panics:on seen.nim
 
 clean:
 	rm -f hirc *.hi *.o acrogrep convert-conf
