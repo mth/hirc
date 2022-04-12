@@ -92,7 +92,7 @@
 3. Oi pasameri...
 3. Eesti LGBT ühing esitab politseisse avalduse
 3. Romantiline jalutuskäik {pääsküla rabas|männiku karjääris}
-3. {~x~|[-ise-]} müüb tõuksi maha ja soetab {eesli|hobuse}
+3. {~x~|[-ise-]} müüb tõuksi maha ja soetab {eesli|hobuse|jalgratta}
 3. lõunaks {lasagne|surströmming|pitsa|surströmmingu pitsa}
 3. See ei ole probleem lamedale maale!
 3. Pottering nõustub plaaniga ja realiseerib selle systemd-s
