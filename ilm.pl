@@ -1,5 +1,3 @@
-use Encode;
-
 #my $UA = 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0';
 my $UA = 'Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0';
 
@@ -9,7 +7,9 @@ sub http {
 
 $last_update = 0;
 #$emhi_url = 'http://213.184.50.180/ilma_andmed/xml/observations.php';
-$emhi_url = 'http://www.ilmateenistus.ee/ilma_andmed/xml/observations.php';
+$emhi_url = 'https://www.ilmateenistus.ee/ilma_andmed/xml/observations.php';
+
+# https://ilmateenistus2022.envir.ee/ilma_andmed/xml/observations.php
 
 sub update {
 	print STDERR "ilmauuendus $dt\n";
@@ -18,8 +18,7 @@ sub update {
 	my $name;
 	for (split /\n/s, http(40, $emhi_url)) {
 		if (/<name>(.*)<\/name>/) {
-			$name_ = $1;
-			$name = encode("UTF-8", $name_);
+			$name = $1;
 			$name =~ s/ *\([^)]*\)//;
 		} elsif (/<airtemperature>(.*)<\/airtemperature>/) {
 			$temp{$name} = $1;
