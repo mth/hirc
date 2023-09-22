@@ -37,11 +37,13 @@ import System.Environment
 import System.Mem
 import System.Random
 
-data IrcCtx c = IrcCtx { conn :: !Handle, lastPong :: MVar Int,
+type RunningStatus = Starting | Running | Stop
+
+data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [C.ByteString],
                          config :: MVar c,
                          currentNick :: IORef C.ByteString,
-                         isQuit :: IORef Bool }
+                         runningStatus :: IORef RunningStatus }
 type Irc c a = ReaderT (IrcCtx c) IO a
 type Message = (C.ByteString, String, [C.ByteString])
 
@@ -120,7 +122,7 @@ say to text = say' return to text
 
 quitIrc :: C.ByteString -> Irc c ()
 quitIrc quitMsg =
-     do ask >>= liftIO . (`writeIORef` True) . isQuit
+     do ask >>= liftIO . (`atomicWriteIORef` Stop) . runningStatus
         ircCmd "QUIT" quitMsg
         fail "QUIT"
 
@@ -130,14 +132,20 @@ pinger :: IrcCtx c -> IO ()
 pinger ctx = run
   where run = do threadDelay (1000 * 1000 * 120)
                  runReaderT (ircCmd "PING" alive) ctx
-                 performGC -- just force GC on every 2 minutes
                  run
 
-pingChecker :: IrcCtx c -> ThreadId -> IO ()
-pingChecker ctx th = run
-  where run = do threadDelay 10000000
+pingChecker :: IrcCtx c -> (Irc c ()) -> ThreadId -> IO ()
+pingChecker ctx ticker th = run
+  where tickEx :: E.SomeException -> IO ()
+        tickEx e = putStrLn ("Tick error: " ++ show e)
+        run = do threadDelay 10000000
+                 performGC -- just force GC on every 10 seconds
                  n <- modifyMVar (lastPong ctx) update
-                 if n >= 300 then throwTo th (ErrorCall "ping timeout") else run
+                 if n >= 300 then throwTo th (ErrorCall "ping timeout")
+                 else do status <- readIORef (runningStatus ctx)
+                         when (status == Running)
+                              (E.catch (runReaderT ticker ctx) tickEx)
+                         run
         update x = let y = x + 10 in return $! (y, y)
 
 processIrc :: (Message -> Irc c ()) -> Irc c ()
@@ -150,10 +158,14 @@ processIrc handler = do
         process _ (_, "PONG", _) = do liftIO $ swapMVar (lastPong ctx) 0
                                       return ()
         process h msg@(_, cmd, !nick:_) | cmd == "NICK" || cmd == "001" =
-             do liftIO $ writeIORef (currentNick ctx) nick
+             do liftIO $ atomicWriteIORef (currentNick ctx) nick
                 h msg
         process h msg  = h msg
-        wait (_, "376", _) = handler (C.empty, "CONNECTED", []) >> run ready
+        wait (_, "376", _) =
+             do atomicModifyIORef (runningStatus ctx)
+                                  (\st -> if st == Starting then Running else st)
+                handler (C.empty, "CONNECTED", [])
+                run ready
         wait (_, "432", _) = liftIO $ fail "Invalid nick"
         wait (_, "433", _) = 
              do n <- liftIO $ randomRIO (10 :: Int, 9999)
@@ -167,8 +179,8 @@ processIrc handler = do
     result
 
 connectIrc :: String -> Int -> String -> (Message -> Irc c ())
-                     -> MVar c -> IO ()
-connectIrc host port nick handler cfgRef =
+                     -> Irc c () -> MVar c -> IO ()
+connectIrc host port nick handler ticker cfgRef =
     withSocketsDo $ withConnection $ \h -> do 
         hSetEncoding h latin1
         hSetBuffering h (BlockBuffering (Just 4096))
@@ -190,7 +202,7 @@ connectIrc host port nick handler cfgRef =
                              else putStrLn ("ioEx: " ++ show e) >> ioError e
         mainThread <- myThreadId
         threads <- sequence $ map forkIO [
-            pinger ctx, pingChecker ctx mainThread, writer 1]
+            pinger ctx, pingChecker ctx ticker mainThread, writer 1]
         finally (E.catch (E.catch (runReaderT run ctx) ioEx) ex)
                 (finally (runReaderT (handler (C.empty, "TERMINATE", [])) ctx)
                          (mapM_ killThread threads))

@@ -523,6 +523,9 @@ bot' msg@(prefix, cmd, args) =
         reply = say replyTo
         from = C.takeWhile (/= '!') prefix
 
+botTicker :: Bot ()
+botTicker = return ()
+
 parseConfigItems :: String -> [ConfigItem]
 parseConfigItems str = skip parse 1 str
   where skip _ line ('\n':s) = skip parse (line + 1) s
@@ -617,7 +620,7 @@ main =
                     (host, port) = servers' !! (nth `mod` length servers')
                 config <- initConfig M.empty cfg >>= newMVar
                 appendFile "seen.dat" "\n"
-                ioCatch (connectIrc host port (nick cfg) bot config)
+                ioCatch (connectIrc host port (nick cfg) bot botTicker config)
                         (failed nth config)
         failed !nth !config ex =
              do putStrLn ("Reconnect after 1 min: Error occured: " ++ show ex)
