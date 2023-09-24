@@ -74,6 +74,13 @@ On /^!tnick +(\w+)/ [
 ]
 On /^!format( |$)/ [Say "Not an abacus"]
 On /^\x01VERSION\x01$/ [Send "NOTICE" ["$0","\SOHVERSION HircB0t v0.0v\SOH"]]
+
+# Each time event is either active or inactive and starts being inactive.
+# If time pattern matches during tick, the time is activated
+# and command executed only if previously inactive. Non-match inactivates time.
+
+# Time /T12:34/ [ExecTopic "#linux.ee" "./update-topic.pl" ["$1"]]
+
 Command "CONNECTED" [] [Join "#hirctest"]
 Command "INVITE" [//,/^#hirctest$/] [Join "#hirctest"]
 Command "366" [//,/(.*)/] [SayTo "$1" "Kurat, ma olen j\195\164lle siin..."]

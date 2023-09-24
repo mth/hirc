@@ -37,7 +37,7 @@ import System.Environment
 import System.Mem
 import System.Random
 
-type RunningStatus = Starting | Running | Stop
+data RunningStatus = Starting | Running | Stop deriving Eq
 
 data IrcCtx c = IrcCtx { conn :: Handle, lastPong :: MVar Int,
                          sync :: MVar (), buffer :: Chan [C.ByteString],
@@ -162,8 +162,8 @@ processIrc handler = do
                 h msg
         process h msg  = h msg
         wait (_, "376", _) =
-             do atomicModifyIORef (runningStatus ctx)
-                                  (\st -> if st == Starting then Running else st)
+             do let setRunning st = (if st == Starting then Running else st, ())
+                liftIO $ atomicModifyIORef (runningStatus ctx) setRunning
                 handler (C.empty, "CONNECTED", [])
                 run ready
         wait (_, "432", _) = liftIO $ fail "Invalid nick"
@@ -188,8 +188,8 @@ connectIrc host port nick handler ticker cfgRef =
         sync <- newMVar ()
         buf <- newChan
         nick' <- newIORef cnick
-        quit <- newIORef False
-        let ctx = IrcCtx h lastPong sync buf cfgRef nick' quit
+        status <- newIORef Starting
+        let ctx = IrcCtx h lastPong sync buf cfgRef nick' status
             writer t = do threadDelay t
                           msg <- readChan buf
                           runReaderT (ircSend C.empty "PRIVMSG" msg) ctx
@@ -197,9 +197,10 @@ connectIrc host port nick handler ticker cfgRef =
             ex (ErrorCall e) = do putStrLn ("ex: " ++ show e)
                                   fail e
             ioEx e | ioeGetErrorString e == "QUIT" = putStrLn "ioEx QUIT"
-            ioEx e = do q <- readIORef quit
-                        if q then putStrLn "ioEx with quit"
-                             else putStrLn ("ioEx: " ++ show e) >> ioError e
+            ioEx e = do q <- readIORef status
+                        case q of
+                          Stop -> putStrLn "ioEx with quit"
+                          _ -> putStrLn ("ioEx: " ++ show e) >> ioError e
         mainThread <- myThreadId
         threads <- sequence $ map forkIO [
             pinger ctx, pingChecker ctx ticker mainThread, writer 1]

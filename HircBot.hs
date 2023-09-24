@@ -30,12 +30,9 @@ import qualified Data.ByteString.Char8 as C
 import Control.Monad
 import Control.Concurrent
 import Control.Exception as E
-import qualified Network.HTTP as W
-import Network.URI
 import Text.Regex.Posix
 import System.Environment
 import System.Exit
-import System.Time
 import System.Random
 import System.Posix.IO
 import System.Posix.Signals
@@ -53,7 +50,7 @@ data EventSpec =
     IfPerm !C.ByteString [EventSpec] [EventSpec] | RandLine !String |
     Exec !C.ByteString [C.ByteString] | Plugin [C.ByteString] !C.ByteString |
     ExecMaxLines !Int !C.ByteString [C.ByteString] |
-    Http !C.ByteString !C.ByteString !Int !Regex [EventSpec] |
+    ExecTopic !C.ByteString !C.ByteString [C.ByteString] |
     Calc !C.ByteString | Append !String !C.ByteString | Rehash |
     Call !C.ByteString [C.ByteString] | Next
     deriving Read
@@ -82,6 +79,7 @@ data Config = Config {
     define   :: [(C.ByteString, [EventSpec])],
     messages :: [(Regex, [EventSpec])],
     commands :: [(String, [Regex], [EventSpec])],
+    times    :: [(Regex, [EventSpec])],
     permits  :: [(C.ByteString, [C.ByteString])],
     nopermit :: [EventSpec]
 } deriving Read
@@ -93,6 +91,7 @@ data ConfigItem =
     Nick String |
     Encoding !EncodingSpec |
     On !Regex [EventSpec] |
+    Time !Regex [EventSpec] |
     Command String [Regex] [EventSpec] |
     Define !C.ByteString [EventSpec] |
     Permit !C.ByteString [C.ByteString] |
@@ -118,7 +117,15 @@ data ConfigSt = ConfigSt {
     perms :: M.Map C.ByteString [AllowSpec],
     -- Map nick (Map channel User)
     users :: M.Map C.ByteString (M.Map C.ByteString User),
-    plugins :: M.Map PluginId (PluginCmd -> Bot ())
+    plugins :: M.Map PluginId (PluginCmd -> Bot ()),
+    topics :: M.Map C.ByteString C.ByteString,
+    timers :: [(Bool, Regex, [EventSpec])]
+}
+
+data EventSrc = EventSrc {
+    channel :: Maybe C.ByteString,
+    from    :: !C.ByteString,
+    prefix  :: !C.ByteString
 }
 
 ioCatch :: IO a -> (IOError -> IO a) -> IO a
@@ -131,8 +138,8 @@ matchRegex re value =
             C.take len (C.drop start value) : collect rest
         collect [] = []
 
-bindArg :: C.ByteString -> [C.ByteString] -> C.ByteString -> Bot C.ByteString
-bindArg prefix bindings str = fmap C.concat $ mapM id (format str)
+bindArg :: EventSrc -> [C.ByteString] -> C.ByteString -> Bot C.ByteString
+bindArg src bindings str = fmap C.concat $ mapM id (format str)
   where format str =
             let (start, rest) = C.span (/= '$') str in
             if C.null rest then
@@ -142,10 +149,13 @@ bindArg prefix bindings str = fmap C.concat $ mapM id (format str)
                     [return start, return rest]
                 else case (C.head rest', C.span (/= '}') (C.tail rest')) of
                     (':', _) ->
-                        return start : return prefix : format (C.tail rest')
+                        return start : return (prefix src) : format (C.tail rest')
                     ('{', (v, t)) | not (C.null t) ->
-                        let ftail = format t in
+                        let ftail = format (C.drop 1 t) in
                         case map C.unpack $ C.words v of
+                            ["topic", channel] ->
+                              fmap (fromMaybe C.empty . M.lookup (C.pack channel)
+                                    . topics) ircConfig : ftail
                             "time" : _ ->
                                 liftIO (getUnixTime >>=
                                             formatUnixTime (C.drop 5 v)) : ftail
@@ -183,27 +193,6 @@ cPutLog s l = liftIO $ C.putStrLn $ C.concat (C.pack s : l)
 lower = C.map toLower
 
 {-
- - HTTP
- -}
-httpGet :: String -> C.ByteString -> Int -> Regex
-                  -> ([C.ByteString] -> Bot ()) -> Bot ()
-httpGet uriStr body maxb re action =
-     do uri <- maybe (fail $ "Bad URI: " ++ uriStr) return (parseURI uriStr)
-        unlift <- escape
-        let hdr = [W.Header W.HdrRange ("bytes=0-" ++ show maxb)]
-            rq = if C.null body then W.Request uri W.GET hdr C.empty
-                 else W.Request uri W.POST (W.Header W.HdrContentLength
-                                                (show $ C.length body):hdr) body
-        liftIO $ forkIO $ ioCatch
-            (do rsp <- W.simpleHTTP rq >>= either (fail . show) return
-                let code = W.rspCode rsp
-                when (code /= (2, 0, 0) && code /= (2,0,6)) (fail $ show $ code)
-                unlift $ maybe (putLog $! "HTTP NOMATCH: " ++ uriStr) action
-                               (matchRegex re $! C.take maxb $ W.rspBody rsp))
-            (\e -> print $! "HTTP " ++ uriStr ++ ": " ++ show e)
-        return ()
-
-{-
  - EXEC
  -}
 sysProcess :: Maybe Fd -> C.ByteString -> [C.ByteString]
@@ -232,20 +221,17 @@ sysProcess input prog argv =
             fdWrite stdOutput "dead plugin walking"
             return ()
 
-readInput :: Handle -> (C.ByteString -> IO Bool) -> IO () -> IO ()
+readInput :: Handle -> (IO () -> C.ByteString -> IO ()) -> IO () -> IO ()
 readInput h f cleanup = ioCatch copy (\_ -> hClose h >> cleanup)
-    where copy = C.hGetLine h >>= f >>= (`when` copy)
+    where copy = C.hGetLine h >>= f copy
 
-execSys :: C.ByteString -> Int -> C.ByteString -> [C.ByteString] -> Bot ()
-execSys to maxLines prog argv =
+execSys :: C.ByteString -> (IO () -> C.ByteString -> Bot ())
+                        -> C.ByteString -> [C.ByteString] -> Bot ()
+execSys to handler prog argv =
      do unlift <- escape
-        let filter l n = let r = take n l in return (n - length r, r)
         liftIO $ do (pid, h) <- sysProcess Nothing prog argv
-                    v <- newMVar maxLines
-                    let sayN s = do
-                         unlift $ say' (liftIO . modifyMVar v . filter) to s
-                         withMVar v (return . (> 0))
-                    forkIO $ readInput h sayN (return ())
+                    let reader cont line = unlift $ handler cont line
+                    forkIO $ readInput h reader (return ())
                     forkIO $ guard (unlift . say to) pid
                     return ()
   where kill sig pid next =
@@ -260,6 +246,15 @@ execSys to maxLines prog argv =
                     threadDelay 1000000
                     kill killProcess pid
                          (getProcessStatus True False pid >> return ())
+
+execToSay :: C.ByteString -> Int -> C.ByteString -> [C.ByteString] -> Bot ()
+execToSay to maxLines prog argv =
+     do v <- liftIO $ newMVar maxLines
+        let filter l n = let r = take n l in return (n - length r, r)
+            sayN continue s =
+                 do say' (liftIO . modifyMVar v . filter) to s
+                    liftIO $ withMVar v (return . (> 0)) >>= (`when` continue)
+        execSys to sayN prog argv
 
 {-
  - SEEN
@@ -302,7 +297,7 @@ emptyUser = Just (User { rank = 0, spoke = C.empty })
 -- XXX sharing seen.dat between channels is probably stupid, but whatever
 appendSeen :: [(C.ByteString, Bool)] -> C.ByteString -> Bot ()
 appendSeen nicks channel =
-     do TOD t _ <- liftIO getClockTime
+     do UnixTime t _ <- liftIO getUnixTime
         mapM (format (show t)) nicks >>=
             liftIO . C.appendFile "seen.dat" . C.unlines
   where clear True (Just u) | rank u /= 0 = Just $ u {spoke = C.empty}
@@ -331,6 +326,11 @@ seenEvent "NICK" old (new:_) =
      do user <- getUserMap old
         mapM_ (appendSeen [(old, False), (new, True)]) (M.keys user)
         updateUserMap (const user) new
+
+seenEvent "TOPIC" _ (channel:topic:_) = setTopic channel topic
+seenEvent "332" _ (_:channel:topic:_) = setTopic channel topic
+seenEvent "331" _ (_:channel:_) = setTopic channel C.empty
+seenEvent "366" _ (_:channel:_) = ircCmd "TOPIC" channel -- End of NAMES list
 
 seenEvent "353" _ args =
      do appendSeen (map stripTag nameList) channel
@@ -371,6 +371,11 @@ seenEvent "TERMINATE" _ _ = killPlugins
 
 seenEvent _ _ _ = return ()
 
+setTopic channel topic =
+    ircModifyConfig $ \cfg ->
+        return cfg { topics = if C.null topic then M.delete channel (topics cfg)
+                              else M.insert channel topic (topics cfg) }
+
 {-
  - PLUGIN
  -}
@@ -392,7 +397,7 @@ startPlugin id@(ExecPlugin (prog:argv)) replyTo =
                 hSetEncoding h latin1
                 hSetBuffering h LineBuffering
                 return (pid, h, fd)
-        let sayTo s = readMVar to >>= unlift . (`say` s) >> return True
+        let sayTo cont s = readMVar to >>= unlift . (`say` s) >> cont
             output = readInput out sayTo $
                          do unlift (removePlugin id)
                             hClose inp
@@ -421,9 +426,8 @@ invokePlugin id to msg =
 {-
  - CORE
  -}
-checkPerm :: Maybe C.ByteString -> C.ByteString -> C.ByteString
-             -> C.ByteString -> Bot Bool
-checkPerm channel nick prefix perm =
+checkPerm :: EventSrc -> C.ByteString -> Bot Bool
+checkPerm src perm =
      do cfg <- ircConfig
         let hasPerm perm =
               case if C.length perm == 1 then C.head perm else ' ' of
@@ -433,19 +437,59 @@ checkPerm channel nick prefix perm =
               _ -> anyPerm $! concat $! maybeToList $! M.lookup perm (perms cfg)
             anyPerm (perm:rest) =
              do ok <- case perm of
-                      Client re -> return $! (matchOnce re prefix) /= Nothing
+                      Client re -> return $! (matchOnce re (prefix src)) /= Nothing
                       Group group -> hasPerm group
                 if ok then return True else anyPerm rest
             anyPerm [] = return False
             hasRank expectRank =
                 -- It's idiotic to give perm based on rank on any channel,
                 -- but I don't know a better solution now for private chat
-                case channel of
+                case channel src of
                 Nothing -> fmap (any (\u -> rank u >= expectRank) . M.elems)
-                                (getUserMap nick)
+                                (getUserMap (from src))
                 Just ch -> fmap (maybe False ((>= expectRank) . rank))
-                                (getUser ch nick)
+                                (getUser ch (from src))
         hasPerm perm
+
+executeEvent :: EventSrc -> (C.ByteString -> Bot C.ByteString) -> EventSpec -> Bot ()
+executeEvent src param event =
+    case event of
+    Send evCmd evArg -> mapM param evArg >>= ircSend C.empty evCmd
+    Say text      -> param text >>= mapM_ reply . C.lines
+    SayTo to text -> do to' <- param to
+                        param text >>= mapM_ (say to') . C.lines
+    Call alias args ->
+        let exec event =
+              if null args then execute param event
+              else do args' <- mapM param args
+                      execute (bindArg src (from src : args')) event in
+        ircConfig >>= maybe (error (C.unpack alias ++ " undefined"))
+                            (mapM_ exec) . M.lookup alias . aliasMap
+    Perm perm     -> do ok <- checkPerm src perm
+                        unless ok (fail "NOPERM")
+    IfPerm perm events evElse ->
+         do ok <- checkPerm src perm
+            mapM_ (execute param) (if ok then events else evElse)
+    Join channel  -> do ch <- param channel
+                        ircSend C.empty "JOIN" [ch]
+    Quit msg      -> param msg >>= quitIrc
+    RandLine fn   -> liftIO (randLine fn) >>= param >>= reply
+    Calc text     -> do let reply' = reply . C.pack
+                        textParam <- param text
+                        ircCatch (reply' $ calc $ C.unpack $ textParam) reply'
+    Rehash        -> killPlugins >> ircModifyConfig getConfig
+    Exec prg args -> mapM param args >>= execToSay replyTo 50 prg
+    ExecMaxLines limit prg args ->
+        mapM param args >>= execToSay replyTo limit prg
+    ExecTopic channel prog args ->
+        let setTopic _ topic = ircSend C.empty "TOPIC" [channel, topic] in
+        mapM param args >>= execSys channel setTopic prog
+    Plugin prg cmd -> param cmd >>= invokePlugin (ExecPlugin prg) replyTo
+    Append file str -> param str >>= liftIO . C.appendFile file
+    Next -> return ()
+  where replyTo = fromMaybe (from src) (channel src)
+        reply = say replyTo
+        execute = executeEvent src
 
 -- wrapper that encodes irc input into desired charset
 bot :: (C.ByteString, String, [C.ByteString]) -> Bot ()
@@ -454,77 +498,53 @@ bot (prefix, cmd, args) =
         bot' (prefix, cmd, map (C.pack . encodeInput cfg . C.unpack) args)
 
 bot' :: (C.ByteString, String, [C.ByteString]) -> Bot ()
-bot' msg@(prefix, cmd, args) =
-    ircCatch (seenEvent cmd from args)
+bot' msg@(msgPrefix, cmd, args) =
+    ircCatch (seenEvent cmd (from src) args)
              (putLog . (("seenEvent " ++ cmd ++ ": ") ++) . show) >>
     ircCatch (ircConfig >>= maybe (liftIO $ print msg) doMatch
                             . M.lookup cmd . patterns) atErr
   where doMatch ((argPattern, events):rest) =
             if length args < length argPattern then doMatch rest
             else maybe (doMatch rest) (\p -> do
-                    let param = bindArg prefix (from : (concat p) ++ [from])
-                    mapM_ (execute param) events
+                    let param = bindArg src (from src : (concat p) ++ [from src])
+                    mapM_ (executeEvent src param) events
                     let isNext Next = True
                         isNext _ = False
                     when (any isNext events) (doMatch rest))
                   (sequence $ zipWith matchRegex argPattern args)
         doMatch [] = do let what = last args
                         when (cmd == "PRIVMSG")
-                             (seenMsg channel from $! what)
+                             (seenMsg (channel src) (from src) $! what)
                         when (args /= [] && C.isPrefixOf (C.singleton '!') what)
                              (cPutLog "NOMATCH " [showMsg msg])
-        execute :: (C.ByteString -> Bot C.ByteString) -> EventSpec -> Bot ()
-        execute param event =
-            case event of
-            Send evCmd evArg -> mapM param evArg >>= ircSend C.empty evCmd
-            Say text      -> param text >>= mapM_ reply . C.lines
-            SayTo to text -> do to' <- param to
-                                param text >>= mapM_ (say to') . C.lines
-            Call alias args ->
-                let exec event =
-                        if null args then execute param event else
-                            do args' <- mapM param args
-                               execute (bindArg prefix (from : args')) event in
-                ircConfig >>= maybe (error (C.unpack alias ++ " undefined"))
-                                    (mapM_ exec) . M.lookup alias . aliasMap
-            Perm perm     -> do ok <- checkPerm channel from prefix perm
-                                unless ok (fail "NOPERM")
-            IfPerm perm events evElse ->
-                 do ok <- checkPerm channel from prefix perm
-                    mapM_ (execute param) (if ok then events else evElse)
-            Join channel  -> do ch <- param channel
-                                ircSend C.empty "JOIN" [ch]
-            Quit msg      -> param msg >>= quitIrc
-            RandLine fn   -> liftIO (randLine fn) >>= param >>= reply
-            Calc text     -> do
-                let reply' = reply . C.pack
-                textParam <- param text
-                ircCatch (reply' $ calc $ C.unpack $ textParam) reply'
-            Rehash        -> killPlugins >> ircModifyConfig (getConfig . users)
-            Exec prg args -> mapM param args >>= execSys replyTo 50 prg
-            ExecMaxLines limit prg args ->
-                mapM param args >>= execSys replyTo limit prg
-            Plugin prg cmd -> param cmd >>= invokePlugin (ExecPlugin prg) replyTo
-            Http uri body maxb pattern events ->
-                do uri' <- param uri
-                   body' <- param body
-                   httpGet (C.unpack uri') body' maxb pattern
-                           (\param -> mapM_ (execute $ bindArg prefix
-                                                     $ from:param) events)
-            Append file str -> param str >>= liftIO . C.appendFile file
-            Next -> return ()
         atErr "NOPERM" = ircConfig >>=
-                mapM_ (execute $! bindArg prefix [from, from]) . nopermit . raw
-        atErr str = putLog str >> ircSend from "NOTICE" [from, C.pack str]
-        replyTo = fromMaybe from channel
-        channel = case args of
-                  s : _ | not (C.null s) && C.head s == '#' -> Just s
-                  _ -> Nothing
-        reply = say replyTo
-        from = C.takeWhile (/= '!') prefix
+            mapM_ (executeEvent src $! bindArg src [from src, from src])
+            . nopermit . raw
+        atErr str = putLog str >> ircSend (from src) "NOTICE" [from src, C.pack str]
+        src = EventSrc {
+            prefix = msgPrefix,
+            channel = case args of
+                      s : _ | not (C.null s) && C.head s == '#' -> Just s
+                      _ -> Nothing,
+            from = C.takeWhile (/= '!') msgPrefix
+        }
 
 botTicker :: Bot ()
-botTicker = return ()
+botTicker = do timeStr <- liftIO (getUnixTime >>= formatUnixTime timeFormat)
+               activity <- ircConfig >>= mapM (run timeStr) . timers
+               ircModifyConfig (\cfg ->
+                    return cfg { timers = merge activity (timers cfg) })
+  where merge (active : activity) ((_, re, events) : rest) =
+            (active, re, events) : merge activity rest
+        merge _ timers = timers
+        run timeStr (wasActive, re, events) =
+            case matchRegex re timeStr of
+              Just param | not wasActive -> do
+                mapM_ (executeEvent src (bindArg src param)) events
+                return True
+              match -> return $ match /= Nothing
+        timeFormat = C.pack "%FT%H:%M"
+        src = EventSrc { prefix = C.empty, channel = Nothing, from = C.empty }
 
 parseConfigItems :: String -> [ConfigItem]
 parseConfigItems str = skip parse 1 str
@@ -547,6 +567,7 @@ collectConfig (item : items) cfg =
         (Nick nick)     -> cfg { nick = nick }
         (Encoding spec) -> cfg { encoding = spec }
         (On re events)  -> cfg { messages = (re, events) : messages cfg }
+        (Time re events) -> cfg { times = (re, events) : times cfg }
         (Command cmd re events) ->
             cfg { commands = (cmd, re, events) : commands cfg }
         (Define name events) -> cfg { define = (name, events) : define cfg }
@@ -578,10 +599,10 @@ readConfig =
         parse str | "Config " `isPrefixOf` dropWhile isSpace str = read str
         parse str = collectConfig (reverse $ parseConfigItems str) Config {
             servers = [], nick = "HircB0t", encoding = Utf8, define = [],
-            messages = [], commands = [], permits = [], nopermit = []
+            messages = [], commands = [], times = [], permits = [], nopermit = []
         }
 
-initConfig !users !cfg =
+initConfig !users !topics !cfg =
      do return $! ConfigSt {
             raw = cfg,
             encodeInput = case encoding cfg of
@@ -592,7 +613,9 @@ initConfig !users !cfg =
             aliasMap = M.fromList (define cfg),
             perms = foldr addPerm M.empty (permits cfg),
             plugins = M.empty,
-            users = users
+            users = users,
+            topics = topics,
+            timers = map (\(re, events) -> (False, re, events)) (times cfg)
         }
   where addPerm (perm, users) = let perms = map getPerm users in
                                 M.alter (Just . maybe perms (perms ++)) perm
@@ -609,7 +632,7 @@ initConfig !users !cfg =
         aster = C.pack ".*"
         dot   = C.pack "\\."
 
-getConfig users = readConfig >>= initConfig users
+getConfig st = readConfig >>= initConfig (users st) (topics st)
 
 main = 
      do initEnv
@@ -618,7 +641,7 @@ main =
   where connect !nth !cfg =
              do let servers' = servers cfg
                     (host, port) = servers' !! (nth `mod` length servers')
-                config <- initConfig M.empty cfg >>= newMVar
+                config <- initConfig M.empty M.empty cfg >>= newMVar
                 appendFile "seen.dat" "\n"
                 ioCatch (connectIrc host port (nick cfg) bot botTicker config)
                         (failed nth config)
