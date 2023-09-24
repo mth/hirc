@@ -482,7 +482,10 @@ executeEvent src param event =
     ExecMaxLines limit prg args ->
         mapM param args >>= execToSay replyTo limit prg
     ExecTopic channel prog args ->
-        let setTopic _ topic = ircSend C.empty "TOPIC" [channel, topic] in
+        let setTopic _ topic =
+             do current <- fmap (M.lookup channel . topics) ircConfig
+                when (Just topic /= current)
+                     (ircSend C.empty "TOPIC" [channel, topic]) in
         mapM param args >>= execSys channel setTopic prog
     Plugin prg cmd -> param cmd >>= invokePlugin (ExecPlugin prg) replyTo
     Append file str -> param str >>= liftIO . C.appendFile file
