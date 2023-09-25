@@ -371,7 +371,7 @@ seenEvent "TERMINATE" _ _ = killPlugins
 
 seenEvent _ _ _ = return ()
 
-setTopic channel topic =
+setTopic !channel !topic =
     ircModifyConfig $ \cfg ->
         return cfg { topics = if C.null topic then M.delete channel (topics cfg)
                               else M.insert channel topic (topics cfg) }
