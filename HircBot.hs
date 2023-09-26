@@ -132,8 +132,7 @@ ioCatch :: IO a -> (IOError -> IO a) -> IO a
 ioCatch = E.catch
 
 matchRegex :: Regex -> C.ByteString -> Maybe [C.ByteString]
-matchRegex re value =
-    collect . drop 1 . elems <$> matchOnce re value
+matchRegex re value = collect . drop 1 . elems <$> matchOnce re value
   where collect ((start, len) : rest) =
             C.take len (C.drop start value) : collect rest
         collect [] = []
