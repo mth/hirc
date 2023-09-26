@@ -1,6 +1,6 @@
 {-
  - HircBot - Simple IRC bot in haskell.
- - Copyright (C) 2008-2019  Madis Janson
+ - Copyright (C) 2008-2023  Madis Janson
  -
  - This file is part of HircBot.
  - 
@@ -133,13 +133,13 @@ ioCatch = E.catch
 
 matchRegex :: Regex -> C.ByteString -> Maybe [C.ByteString]
 matchRegex re value =
-    fmap (collect . drop 1 . elems) (matchOnce re value)
+    collect . drop 1 . elems <$> matchOnce re value
   where collect ((start, len) : rest) =
             C.take len (C.drop start value) : collect rest
         collect [] = []
 
 bindArg :: EventSrc -> [C.ByteString] -> C.ByteString -> Bot C.ByteString
-bindArg src bindings str = fmap C.concat $ mapM id (format str)
+bindArg src bindings str = C.concat <$> mapM id (format str)
   where format str =
             let (start, rest) = C.span (/= '$') str in
             if C.null rest then
@@ -154,8 +154,8 @@ bindArg src bindings str = fmap C.concat $ mapM id (format str)
                         let ftail = format (C.drop 1 t) in
                         case map C.unpack $ C.words v of
                             ["topic", channel] ->
-                              fmap (fromMaybe C.empty . M.lookup (C.pack channel)
-                                    . topics) ircConfig : ftail
+                              (fromMaybe C.empty . M.lookup (C.pack channel)
+                                . topics <$> ircConfig) : ftail
                             "time" : _ ->
                                 liftIO (getUnixTime >>=
                                             formatUnixTime (C.drop 5 v)) : ftail
@@ -168,7 +168,7 @@ bindArg src bindings str = fmap C.concat $ mapM id (format str)
 
 randLine :: String -> IO C.ByteString
 randLine fn =
-     do l <- fmap C.lines (C.readFile fn)
+     do l <- C.lines <$> C.readFile fn
         n <- randomRIO (0, length l - 1)
         parts <- format (C.copy (l !! n))
         return $! C.concat parts
@@ -260,12 +260,10 @@ execToSay to maxLines prog argv =
  - SEEN
  -}
 getUserMap :: C.ByteString -> Bot (M.Map C.ByteString User)
-getUserMap nick =
-    fmap (fromMaybe M.empty . M.lookup (lower nick) . users) ircConfig
+getUserMap nick = fromMaybe M.empty . M.lookup (lower nick) . users <$> ircConfig
 
 getUser :: C.ByteString -> C.ByteString -> Bot (Maybe User)
-getUser channel nick =
-    fmap (M.lookup channel) (getUserMap nick)
+getUser channel nick = M.lookup channel <$> getUserMap nick
 
 updateUserMap :: (M.Map C.ByteString User -> M.Map C.ByteString User)
                     -> C.ByteString -> Bot ()
@@ -445,10 +443,10 @@ checkPerm src perm =
                 -- It's idiotic to give perm based on rank on any channel,
                 -- but I don't know a better solution now for private chat
                 case channel src of
-                Nothing -> fmap (any (\u -> rank u >= expectRank) . M.elems)
-                                (getUserMap (from src))
-                Just ch -> fmap (maybe False ((>= expectRank) . rank))
-                                (getUser ch (from src))
+                Nothing -> any (\u -> rank u >= expectRank) . M.elems
+                            <$> getUserMap (from src)
+                Just ch -> maybe False ((>= expectRank) . rank)
+                            <$> getUser ch (from src)
         hasPerm perm
 
 executeEvent :: EventSrc -> (C.ByteString -> Bot C.ByteString) -> EventSpec -> Bot ()
@@ -483,7 +481,7 @@ executeEvent src param event =
         mapM param args >>= execToSay replyTo limit prg
     ExecTopic channel prog args ->
         let setTopic _ topic =
-             do current <- fmap (M.lookup channel . topics) ircConfig
+             do current <- M.lookup channel . topics <$> ircConfig
                 when (Just topic /= current)
                      (ircSend C.empty "TOPIC" [channel, topic]) in
         mapM param args >>= execSys channel setTopic prog

@@ -1,6 +1,6 @@
 {-
  - Lowlevel IRC client library for HircBot.
- - Copyright (C) 2008-2019  Madis Janson
+ - Copyright (C) 2008-2023  Madis Janson
  -
  - This file is part of HircBot.
  - 
@@ -87,8 +87,8 @@ readMsg message =
 
 ircSend :: C.ByteString -> String -> [C.ByteString] -> Irc c ()
 ircSend prefix cmd arg =
-     do h <- fmap conn ask
-        m <- fmap sync ask
+     do h <- conn <$> ask
+        m <- sync <$> ask
         liftIO $ withMVar m $ \_ ->
              do C.hPutStr h $ showMsg (prefix, cmd, arg)
                 hPutStr h "\r\n"

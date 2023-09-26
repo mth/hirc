@@ -1,0 +1,9 @@
+*.o
+*.hi
+/hirc
+/hirc-prof
+/utf8-recode
+/calc
+/convert-conf
+/acrogrep
+/seen
