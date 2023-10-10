@@ -79,7 +79,7 @@ data Config = Config {
     define   :: [(C.ByteString, [EventSpec])],
     messages :: [(Regex, [EventSpec])],
     commands :: [(String, [Regex], [EventSpec])],
-    times    :: [(Regex, [EventSpec])],
+    times    :: [(Regex, String, [EventSpec])],
     permits  :: [(C.ByteString, [C.ByteString])],
     nopermit :: [EventSpec]
 } deriving Read
@@ -91,7 +91,7 @@ data ConfigItem =
     Nick String |
     Encoding !EncodingSpec |
     On !Regex [EventSpec] |
-    Time !Regex [EventSpec] |
+    Time !Regex String [EventSpec] |
     Command String [Regex] [EventSpec] |
     Define !C.ByteString [EventSpec] |
     Permit !C.ByteString [C.ByteString] |
@@ -119,7 +119,7 @@ data ConfigSt = ConfigSt {
     users :: M.Map C.ByteString (M.Map C.ByteString User),
     plugins :: M.Map PluginId (PluginCmd -> Bot ()),
     topics :: M.Map C.ByteString C.ByteString,
-    timers :: [(Bool, Regex, [EventSpec])]
+    timers :: [(Bool, Regex, C.ByteString, [EventSpec])]
 }
 
 data EventSrc = EventSrc {
@@ -150,11 +150,12 @@ bindArg src bindings str = C.concat <$> mapM id (format str)
                     (':', _) ->
                         return start : return (prefix src) : format (C.tail rest')
                     ('{', (v, t)) | not (C.null t) ->
-                        let ftail = format (C.drop 1 t) in
+                        let ftail = format (C.drop 1 t)
+                            topic channel = (fromMaybe C.empty . M.lookup channel
+                                             . topics <$> ircConfig) : ftail in
                         case map C.unpack $ C.words v of
-                            ["topic", channel] ->
-                              (fromMaybe C.empty . M.lookup (C.pack channel)
-                                . topics <$> ircConfig) : ftail
+                            ["topic"] -> maybe ftail topic (channel src)
+                            ["topic", channel] -> topic (C.pack channel)
                             "time" : _ ->
                                 liftIO (getUnixTime >>=
                                             formatUnixTime (C.drop 5 v)) : ftail
@@ -534,17 +535,20 @@ botTicker = do timeStr <- liftIO (getUnixTime >>= formatUnixTime timeFormat)
                activity <- ircConfig >>= mapM (run timeStr) . timers
                ircModifyConfig (\cfg ->
                     return cfg { timers = merge activity (timers cfg) })
-  where merge (active : activity) ((_, re, events) : rest) =
-            (active, re, events) : merge activity rest
+  where merge (active : activity) ((_, re, from, events) : rest) =
+            (active, re, from, events) : merge activity rest
         merge _ timers = timers
-        run timeStr (wasActive, re, events) =
+        run timeStr (wasActive, re, from, events) =
             case matchRegex re timeStr of
               Just param | not wasActive -> do
+                let src = source from
                 mapM_ (executeEvent src (bindArg src param)) events
                 return True
               match -> return $ match /= Nothing
         timeFormat = C.pack "%FT%H:%M"
-        src = EventSrc { prefix = C.empty, channel = Nothing, from = C.empty }
+        source from =
+          let channel = if C.head from == '#' then Just from else Nothing in
+          EventSrc { prefix = C.empty, channel = channel, from = from }
 
 parseConfigItems :: String -> [ConfigItem]
 parseConfigItems str = skip parse 1 str
@@ -567,7 +571,7 @@ collectConfig (item : items) cfg =
         (Nick nick)     -> cfg { nick = nick }
         (Encoding spec) -> cfg { encoding = spec }
         (On re events)  -> cfg { messages = (re, events) : messages cfg }
-        (Time re events) -> cfg { times = (re, events) : times cfg }
+        (Time re from events) -> cfg { times = (re, from, events) : times cfg }
         (Command cmd re events) ->
             cfg { commands = (cmd, re, events) : commands cfg }
         (Define name events) -> cfg { define = (name, events) : define cfg }
@@ -615,7 +619,8 @@ initConfig !users !topics !cfg =
             plugins = M.empty,
             users = users,
             topics = topics,
-            timers = map (\(re, events) -> (False, re, events)) (times cfg)
+            timers = map (\(re, from, events) ->
+                            (False, re, C.pack from, events)) (times cfg)
         }
   where addPerm (perm, users) = let perms = map getPerm users in
                                 M.alter (Just . maybe perms (perms ++)) perm

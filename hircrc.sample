@@ -79,7 +79,7 @@ On /^\x01VERSION\x01$/ [Send "NOTICE" ["$0","\SOHVERSION HircB0t v0.0v\SOH"]]
 # If time pattern matches during tick, the time is activated
 # and command executed only if previously inactive. Non-match inactivates time.
 
-# Time /T05:55$/ [ExecTopic "#linux.ee" "/usr/bin/perl" ["plugins/kernel-versions.pl", "${topic #linux.ee+}"]]
+# Time /T05:55$/ "" [ExecTopic "#linux.ee" "/usr/bin/perl" ["plugins/kernel-versions.pl", "${topic #linux.ee+}"]]
 
 Command "CONNECTED" [] [Join "#hirctest"]
 Command "INVITE" [//,/^#hirctest$/] [Join "#hirctest"]
