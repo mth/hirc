@@ -45,7 +45,7 @@ while ($html =~ /<div\ [^>]*?[" ]h-entry">.*?
 	next unless $1 >= 50;
 	my $url = unescape($2);
 	my $description = unescape($3);
-	next if $lobster_log{$url};
+	next if $lobster_log{$url} or $url =~ /^https:\/\/lobste.rs\//;
 	print "$url  $description\n";
 	open my $log, '>>', $log_file or die "Log $log_file error: $!\n";
 	print $log "$url\n"
