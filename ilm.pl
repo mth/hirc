@@ -1,5 +1,5 @@
 #my $UA = 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0';
-my $UA = 'Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0';
+my $UA = 'Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0';
 
 sub http {
 	`curl -sf -A '$UA' --connect-timeout '$_[0]' '$_[1]'`
@@ -19,15 +19,18 @@ sub update {
 	for (split /\n/s, http(40, $emhi_url)) {
 		if (/<name>(.*)<\/name>/) {
 			$name = $1;
-			$name =~ s/ *\([^)]*\)//;
+			$name =~ s/ *(?:\([^)]*\))?//;
 		} elsif (/<airtemperature>(.*)<\/airtemperature>/) {
 			$temp{$name} = $1;
 			$temp{Tartu} = $temp{$name} if $name =~ /^Tartu-Kvissental/;
-			$temp{Tallinn} = $temp{$name} if $name eq 'Tallinn-Harku';
 			push @parnu, $temp{$name}
-				 if $name_ =~ /P.rnu/ && $temp{$name} =~ /\d/;
+				 if $name_ =~ /P..?rnu/ && $temp{$name} =~ /\d/;
 		}
 	}
+	my @Tallinn = grep {$_} map {$temp{$_}} qw(Pirita Tallinn-Harku);
+        push @Tallinn, $temp{Rohuneeme} unless @Tallinn;
+        $temp{Tallinn} += $_ for @Tallinn;
+        $temp{Tallinn} /= @Tallinn;
 	if (@parnu) {
 		my $parnu = 0;
 		$parnu += $_ for @parnu;
