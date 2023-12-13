@@ -33,7 +33,7 @@ seenFile.close
 if seen.len < count:
     let tmpName = datFile & ".tmp"
     let tmpFile = tmpName.open fmAppend # fmAppend to not truncate before locking
-    when defined(arm) and defined(linux):
+    when (defined(arm) or defined(arm64)) and defined(linux):
         var lock = Tflock(l_type: 1)
     else:
         var lock = Tflock(l_type: static[cshort](F_WRLCK))
