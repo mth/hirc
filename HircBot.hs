@@ -73,7 +73,7 @@ instance Read Regex where
     readsPrec _ _ = []
 
 data Config = Config {
-    servers  :: [(String, Int)],
+    servers  :: [(String, Int, Bool)],
     nick     :: String,
     encoding :: !EncodingSpec,
     define   :: [(C.ByteString, [EventSpec])],
@@ -88,6 +88,7 @@ type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
 data ConfigItem =
     Server String !Int |
+    Ipv6Server String !Int |
     Nick String |
     Encoding !EncodingSpec |
     On !Regex [EventSpec] |
@@ -567,7 +568,8 @@ parseConfigItems str = skip parse 1 str
 collectConfig :: [ConfigItem] -> Config -> Config
 collectConfig (item : items) cfg =
     collectConfig items $ case item of
-        (Server host port) -> cfg { servers = (host, port) : servers cfg }
+        (Server host port) -> cfg { servers = (host, port, False) : servers cfg }
+        (Ipv6Server host port) -> cfg { servers = (host, port, True) : servers cfg }
         (Nick nick)     -> cfg { nick = nick }
         (Encoding spec) -> cfg { encoding = spec }
         (On re events)  -> cfg { messages = (re, events) : messages cfg }
@@ -645,10 +647,10 @@ main =
         readConfig >>= connect 0
   where connect !nth !cfg =
              do let servers' = servers cfg
-                    (host, port) = servers' !! (nth `mod` length servers')
+                    server = servers' !! (nth `mod` length servers')
                 config <- initConfig M.empty M.empty cfg >>= newMVar
                 appendFile "seen.dat" "\n"
-                ioCatch (connectIrc host port (nick cfg) bot botTicker config)
+                ioCatch (connectIrc server (nick cfg) bot botTicker config)
                         (failed nth config)
         failed !nth !config ex =
              do putStrLn ("Reconnect after 1 min: Error occured: " ++ show ex)

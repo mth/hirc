@@ -178,9 +178,9 @@ processIrc handler = do
         result = run wait
     result
 
-connectIrc :: String -> Int -> String -> (Message -> Irc c ())
+connectIrc :: (String, Int, Bool) -> String -> (Message -> Irc c ())
                      -> Irc c () -> MVar c -> IO ()
-connectIrc host port nick handler ticker cfgRef =
+connectIrc (host, port, preferIpv6) nick handler ticker cfgRef =
     withSocketsDo $ withConnection $ \h -> do 
         hSetEncoding h latin1
         hSetBuffering h (BlockBuffering (Just 4096))
@@ -211,7 +211,8 @@ connectIrc host port nick handler ticker cfgRef =
   where withConnection client = do
           let hints = defaultHints { addrSocketType = Stream }
           addrInfo <- getAddrInfo (Just hints) (Just host) (Just (show port))
-          let addr = head addrInfo
+          let addr = head (filter (\addr -> preferIpv6 && addrFamily addr == AF_INET6)
+	                          addrInfo ++ addrInfo)
           sock <- E.bracketOnError (socket (addrFamily addr) (addrSocketType addr)
                                    (addrProtocol addr)) close $ \sock -> do
             connect sock $ addrAddress addr
