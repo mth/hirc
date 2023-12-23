@@ -88,7 +88,7 @@ type ConfigPatterns = M.Map String [([Regex], [EventSpec])]
 
 data ConfigItem =
     Server String !Int |
-    Ipv6Server String !Int |
+    IPv6Server String !Int |
     Nick String |
     Encoding !EncodingSpec |
     On !Regex [EventSpec] |
@@ -569,7 +569,7 @@ collectConfig :: [ConfigItem] -> Config -> Config
 collectConfig (item : items) cfg =
     collectConfig items $ case item of
         (Server host port) -> cfg { servers = (host, port, False) : servers cfg }
-        (Ipv6Server host port) -> cfg { servers = (host, port, True) : servers cfg }
+        (IPv6Server host port) -> cfg { servers = (host, port, True) : servers cfg }
         (Nick nick)     -> cfg { nick = nick }
         (Encoding spec) -> cfg { encoding = spec }
         (On re events)  -> cfg { messages = (re, events) : messages cfg }
