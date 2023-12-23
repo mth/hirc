@@ -212,7 +212,7 @@ connectIrc (host, port, preferIpv6) nick handler ticker cfgRef =
           let hints = defaultHints { addrSocketType = Stream }
           addrInfo <- getAddrInfo (Just hints) (Just host) (Just (show port))
           let addr = head (filter (\addr -> preferIpv6 && addrFamily addr == AF_INET6)
-	                          addrInfo ++ addrInfo)
+                                  addrInfo ++ addrInfo)
           sock <- E.bracketOnError (socket (addrFamily addr) (addrSocketType addr)
                                    (addrProtocol addr)) close $ \sock -> do
             connect sock $ addrAddress addr
