@@ -3,7 +3,7 @@
 use strict;
 use Sys::Syslog;
 
-my $lobster_url = 'https://lobste.rs/t/linux,unix,networking,hardware';
+my $lobster_url = 'https://lobste.rs/t/linux,unix,networking,hardware,release';
 my $log_file = $ARGV[0] // 'lobster.log';
 
 sleep rand($ARGV[1] // 0);
