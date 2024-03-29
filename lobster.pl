@@ -6,8 +6,6 @@ use Sys::Syslog;
 my $lobster_url = 'https://lobste.rs/t/linux,unix,networking,hardware,release';
 my $log_file = $ARGV[0] // 'lobster.log';
 
-sleep rand($ARGV[1] // 0);
-
 sub fetch_lobster {
 	open my $out, '-|', '/usr/bin/curl', '-sS', $lobster_url or die "curl $lobster_url: $!";
 	local $/;
@@ -45,7 +43,7 @@ while ($html =~ /<div\ [^>]*?[" ]h-entry">.*?
 	next unless $1 >= 50;
 	my $url = unescape($2);
 	my $description = unescape($3);
-	next if $lobster_log{$url} or $url =~ /^https:\/\/lobste.rs\//;
+	next if $lobster_log{$url} or $url !~ /^https?:\/\// or $url =~ /^https:\/\/lobste.rs\//;
 	print "$url  $description\n";
 	open my $log, '>>', $log_file or die "Log $log_file error: $!\n";
 	print $log "$url\n"
