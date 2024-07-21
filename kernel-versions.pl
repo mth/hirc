@@ -4,7 +4,7 @@ sub kernel_list {
 	my @result;
 	if (open my $inf, '-|', '/usr/bin/curl', '-s', $URL) {
 		while (<$inf>) {
-			while (/<strong>(\d+.\d+.\d+)<\/strong>/g) {
+			while (/<strong>(\d+.\d+(?:.\d+)?)<\/strong>/g) {
 				push @result, $1
 			}
 		}
