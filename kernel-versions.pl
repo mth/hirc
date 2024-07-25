@@ -8,6 +8,7 @@ sub kernel_list {
 				push @result, $1
 			}
 		}
+		shift @result if grep(/^\Q$result[0]\E\./, @result[1..$#result]);
 		return join(' | ', @result)
 	}
 	print STDERR "curl $URL: $!";
