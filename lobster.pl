@@ -3,7 +3,7 @@
 use strict;
 use Sys::Syslog;
 
-my $lobster_url = 'https://lobste.rs/t/linux,unix,networking,hardware,release';
+my $lobster_url = 'https://lobste.rs/t/linux,unix,networking,hardware,release,security';
 my $log_file = $ARGV[0] // 'lobster.log';
 
 sub fetch_lobster {
