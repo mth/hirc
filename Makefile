@@ -1,5 +1,5 @@
 # Use the following to install ghc with mtl and network libs on debian:
-# apt install ghc libghc-network-dev libghc-regex-posix-dev libghc-unix-time-dev libghc-random-dev
+# apt install ghc libghc-network-dev libghc-regex-posix-dev libghc-unix-time-dev libghc-random-dev binutils-gold
 
 HIRC = Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
 
