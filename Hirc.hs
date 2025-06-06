@@ -26,6 +26,7 @@ module Hirc (
 import Control.Arrow
 import Control.Concurrent
 import Control.Exception as E
+import Control.Monad
 import Control.Monad.Reader
 import qualified Data.ByteString.Char8 as C
 import Data.IORef
