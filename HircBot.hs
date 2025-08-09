@@ -195,16 +195,15 @@ cPutLog s l = liftIO $ C.putStrLn $ C.concat (C.pack s : l)
 lower = C.map toLower
 
 findLinesStarting :: String -> Int -> C.ByteString -> IO [C.ByteString]
-findLinesStarting filename sepLen str =
-    if strLen > 1 then withBinaryFile filename ReadMode (`findLines` []) else return []
+findLinesStarting fn sepLen str =
+    if strLen <= 1 then return [] else mapMaybe checkLine . C.lines <$> C.readFile fn
   where lowStr = lower str
         strLen = C.length lowStr
-        findLines h results = C.hGetLine h >>= findLines h . checkLine results
-        checkLine results line =
+        checkLine line =
             if lower (C.take strLen line) == lowStr then
-                C.concat [C.take (strLen - sepLen) line, C.pack " - ",
-                          C.drop strLen line] : results
-            else results
+                Just (C.concat [C.take (strLen - sepLen) line, C.pack " - ",
+                                C.drop strLen line])
+            else Nothing
 
 {-
  - EXEC
