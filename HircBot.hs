@@ -1,6 +1,6 @@
 {-
  - HircBot - Simple IRC bot in haskell.
- - Copyright (C) 2008-2023  Madis Janson
+ - Copyright (C) 2008-2025  Madis Janson
  -
  - This file is part of HircBot.
  -
