@@ -6,7 +6,7 @@ HIRC = Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
 all: hirc acrogrep convert-conf
 
 hirc: $(HIRC) initenv.o
-	ghc -o $@ -W -O2 -XBangPatterns -XForeignFunctionInterface -split-sections --make $+ -L.
+	ghc -o $@ -W -O2 -XBangPatterns -XForeignFunctionInterface -split-sections -j`nproc` --make $+ -L.
 	strip $@
 
 hirc-prof: $(HIRC)
