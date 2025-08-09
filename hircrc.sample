@@ -11,20 +11,20 @@ On /^!reload$/ [
 	Say "Matrix ok."
 ]
 On /^= ([^:?]*)$/ [Calc "$1"]
-On /^(\?\?? .*|!\? .*|!new$)/ [Plugin ["/usr/bin/perl","dict.pl"] "$: $1"]
+On /^(\?\?? .*|!\? .*|!new$)/ [Plugin ["/usr/bin/perl","plugins/dict.pl"] "$: $1"]
 On /^((!learn|!add) .*)/ [
 	Perm "mdict",
-	Plugin ["/usr/bin/perl","dict.pl"] "$: $1"
+	Plugin ["/usr/bin/perl","plugins/dict.pl"] "$: $1"
 ]
 On /^((!brainwash|!bite|!forget) .*)/ [
 	Perm "dict",
-	Plugin ["/usr/bin/perl","dict.pl"] "$: $1"
+	Plugin ["/usr/bin/perl","plugins/dict.pl"] "$: $1"
 ]
 On /^!say\s+((!learn|!add) .*)/ [
 	Perm "mdict",
 	Append "say.log" "<$:> $1\n",
 	SayTo "#hirctest" "$1",
-	Plugin ["/usr/bin/perl","dict.pl"] "$: $1"
+	Plugin ["/usr/bin/perl","plugins/dict.pl"] "$: $1"
 ]
 On /^!insult\s+(\S(.*\S)?)\s*$/ [
 	Perm "dict",
@@ -37,8 +37,8 @@ On /^!history +([^ ].*)/ [
 	Exec "./history" ["base.dict","$1"]
 ]
 On /^!seen *$/ [RandLine "insult.txt"]
-On /^!seen +([^ ]+)/ [Exec "/usr/bin/perl" ["seen.pl","$0","$1"]]
-On /^!decide\s+(\S.*)$/ [Exec "/usr/bin/perl" ["decide.pl","$1"]]
+On /^!seen +([^ ]+)/ [Exec "/usr/bin/perl" ["plugins/seen.pl","$0","$1"]]
+On /^!decide\s+(\S.*)$/ [Exec "/usr/bin/perl" ["plugins/decide.pl","$1"]]
 On /^!plan\s+(\S.*)$/ [
 	Perm "mdict",
 	Say "1. $1",
@@ -46,7 +46,7 @@ On /^!plan\s+(\S.*)$/ [
 	RandLine "plans.txt"
 ]
 On /^!time$/ [Exec "/bin/date" []]
-On /^!country\s+(\w+)/ [Exec "./acrogrep" ["countries.txt","$1"]]
+On /^!country\s+(\w+)/ [LinesStarting 10 "countries.txt" 1 "$1\t" [RandLine "insult.txt"]]
 On /^!say\s+((m8ga\W*|T3EE\W*)*(.*))$/ [
 	Perm "mdict",
 	Append "say.log" "<$:> $1\n",
@@ -57,16 +57,16 @@ On /^!emote\s+(.*)$/ [
 	Append "say.log" "* $:\t$1\n",
 	SayTo "#hirctest" "\SOHACTION $1\SOH"
 ]
-On /^!ilm$/ [Plugin ["/usr/bin/perl","ilm.pl"] ""]
-On /^!vera +(\w+)/ [Exec "./acrogrep" ["vera.txt","$1"]]
-On /^!rfc +(\w+)/ [Exec "/usr/bin/perl" ["find-rfc.pl","$1"]]
+On /^!ilm$/ [Plugin ["/usr/bin/perl","plugins/ilm.pl"] ""]
+On /^!vera +(\w+)/ [LinesStarting 50 "vera.txt" 1 "$1\t" [Say "$1? WTF is that?"]]
+On /^!rfc +(\w+)/ [Exec "/usr/bin/perl" ["plugins/find-rfc.pl","$1"]]
 On /^!help *$/ [Say "? ?? !? !add !bite !brainwash !compliment !country !decide !emote !forget !help !history !i-am-idiot !ilm !insult !new !ping !plan !rfc !say !seen !tnick !time !vera"]
 On /^!help +i-am-idiot *$/ [Say "No cure for that"]
 On /^!help +!i-am-idiot *$/ [Say "Yes, you are."]
 On /^!help +bite *$/ [Say "Hammustab definitsioonil | saba \195\164ra"]
 On /^!help \W/ [Say "No help, go find a rope"]
 On /^!ping( |$)/ [Say "PONG!!!"]
-On /^!isitfriday( |$)/ [Exec "/usr/bin/perl" ["isitfriday.pl"]]
+On /^!isitfriday( |$)/ [Exec "/usr/bin/perl" ["plugins/isitfriday.pl"]]
 On /^Tuxaator_?[:,] / [RandLine "talk.txt"]
 On /^!tnick +(\w+)/ [
 	Perm "root",
