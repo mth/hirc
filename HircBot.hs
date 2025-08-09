@@ -196,7 +196,7 @@ lower = C.map toLower
 
 findLinesStarting :: String -> Int -> C.ByteString -> IO [C.ByteString]
 findLinesStarting fn sepLen str =
-    if strLen <= 1 then return [] else mapMaybe checkLine . C.lines <$> C.readFile fn
+    if strLen <= sepLen then return [] else mapMaybe checkLine . C.lines <$> C.readFile fn
   where lowStr = lower str
         strLen = C.length lowStr
         checkLine line =
