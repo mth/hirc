@@ -27,16 +27,16 @@ int main(int argc, char** argv) {
 		puts("illegal argv");
 		return 1;
 	}
-	if (!(f = fopen(argv[1], "rt"))) {
+	if (!(f = fopen(argv[1], "rt"))) { // open $1
 		perror(argv[1]);
 		return 2;
 	}
-	s = argv[2];
+	s = argv[2]; // upcase $2
 	for (l = 0; s[l]; ++l)
 		s[l] = toupper(s[l]);
 	c = *s;
 	while (fgets(buf, sizeof buf, f) && *buf <= c) {
-		if (*buf == c && !strncmp(buf, s, l) && buf[l] == '\t') {
+		if (*buf == c && !strncmp(buf, s, l) && buf[l] == '\t') { // if /^$2\t/
 			printf("%s - %s", s, buf + l + 1);
 			found = 1;
 		}

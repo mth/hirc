@@ -3,17 +3,17 @@
  - Copyright (C) 2008-2023  Madis Janson
  -
  - This file is part of HircBot.
- - 
+ -
  - HircBot is free software: you can redistribute it and/or modify
  - it under the terms of the GNU General Public License as published by
  - the Free Software Foundation, either version 3 of the License, or
  - (at your option) any later version.
- - 
+ -
  - HircBot is distributed in the hope that it will be useful,
  - but WITHOUT ANY WARRANTY; without even the implied warranty of
  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  - GNU General Public License for more details.
- - 
+ -
  - You should have received a copy of the GNU General Public License
  - along with HircBot.  If not, see <http://www.gnu.org/licenses/>.
  -}
@@ -52,6 +52,7 @@ data EventSpec =
     ExecMaxLines !Int !C.ByteString [C.ByteString] |
     ExecTopic !C.ByteString !C.ByteString [C.ByteString] |
     Calc !C.ByteString | Append !String !C.ByteString | Rehash |
+    LinesStarting !Int !String !Int !C.ByteString [EventSpec] |
     Call !C.ByteString [C.ByteString] | Next
     deriving Read
 
@@ -192,6 +193,18 @@ dropPath p = if C.null s then p else dropPath (C.tail s)
 putLog = liftIO . putStrLn
 cPutLog s l = liftIO $ C.putStrLn $ C.concat (C.pack s : l)
 lower = C.map toLower
+
+findLinesStarting :: String -> Int -> C.ByteString -> IO [C.ByteString]
+findLinesStarting filename sepLen str =
+    if strLen > 1 then withBinaryFile filename ReadMode (`findLines` []) else return []
+  where lowStr = lower str
+        strLen = C.length lowStr
+        findLines h results = C.hGetLine h >>= findLines h . checkLine results
+        checkLine results line =
+            if lower (C.take strLen line) == lowStr then
+                C.concat [C.take (strLen - sepLen) line, C.pack " - ",
+                          C.drop strLen line] : results
+            else results
 
 {-
  - EXEC
@@ -473,6 +486,11 @@ executeEvent src param event =
                         ircSend C.empty "JOIN" [ch]
     Quit msg      -> param msg >>= quitIrc
     RandLine fn   -> liftIO (randLine fn) >>= param >>= reply
+    LinesStarting limit fn sepLen find notFound ->
+         do findText <- param find
+            results <- liftIO (findLinesStarting fn sepLen findText)
+            if null results then mapM_ (execute param) notFound
+                            else mapM_ reply (take limit results)
     Calc text     -> do let reply' = reply . C.pack
                         textParam <- param text
                         ircCatch (reply' $ calc $ C.unpack $ textParam) reply'
@@ -641,7 +659,7 @@ initConfig !users !topics !cfg =
 
 getConfig st = readConfig >>= initConfig (users st) (topics st)
 
-main = 
+main =
      do initEnv
         hSetBuffering stdout LineBuffering
         readConfig >>= connect 0
