@@ -3,7 +3,7 @@
 
 HIRC = Hirc.hs Utf8Conv.hs Calculator.hs HircBot.hs
 
-all: hirc acrogrep convert-conf
+all: hirc convert-conf plugins/seen
 
 hirc: $(HIRC) initenv.o
 	ghc -o $@ -W -O2 -XBangPatterns -XForeignFunctionInterface -split-sections -j`nproc` --make $+ -L.
@@ -25,8 +25,8 @@ calc: Calculator.hs CalcTest.hs
 convert-conf: ConvertConf.hs
 	ghc -o $@ -W -O2 -XBangPatterns --make $+
 
-seen: seen.nim
-	nim c -d:release --gc:none --panics:on seen.nim
+plugins/seen: plugins/seen.nim
+	nim c -d:release --gc:none --panics:on $<
 
 clean:
-	rm -f hirc *.hi *.o acrogrep convert-conf
+	rm -f hirc *.hi *.o convert-conf plugins/seen

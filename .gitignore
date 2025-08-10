@@ -5,5 +5,4 @@
 /utf8-recode
 /calc
 /convert-conf
-/acrogrep
-/seen
+/plugins/seen
