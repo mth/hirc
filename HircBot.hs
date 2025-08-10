@@ -194,13 +194,11 @@ putLog = liftIO . putStrLn
 cPutLog s l = liftIO $ C.putStrLn $ C.concat (C.pack s : l)
 lower = C.map toLower
 
-ioTry :: (C.ByteString -> b) -> IO b -> IO b
-ioTry handler action = ioCatch action (\err -> return $ handler $ C.pack $ show err)
-
 findLinesStarting :: String -> Int -> C.ByteString -> IO [C.ByteString]
 findLinesStarting fn sepLen str =
     if strLen <= sepLen then return []
-    else ioTry (:[]) (mapMaybe checkLine . C.lines <$> C.readFile fn)
+    else ioCatch (mapMaybe checkLine . C.lines <$> C.readFile fn)
+                 (\err -> return [C.pack $ show err])
   where lowStr = lower str
         strLen = C.length lowStr
         checkLine line =
@@ -488,7 +486,8 @@ executeEvent src param event =
     Join channel  -> do ch <- param channel
                         ircSend C.empty "JOIN" [ch]
     Quit msg      -> param msg >>= quitIrc
-    RandLine fn   -> liftIO (ioTry id (randLine fn)) >>= param >>= reply
+    RandLine fn   -> ircCatch (liftIO (randLine fn) >>= param)
+                              (return . C.pack) >>= reply
     LinesStarting limit fn sepLen find notFound ->
          do findText <- param find
             results <- liftIO (findLinesStarting fn sepLen findText)
