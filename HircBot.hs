@@ -508,7 +508,7 @@ executeEvent src param event =
     Next -> return ()
   where replyTo = fromMaybe (from src) (channel src)
         reply = say replyTo
-        tryReply action = ircCatch action (return . C.pack) >>= reply
+        tryReply action = ircCatch (action >>= reply) (reply . C.pack)
         execute = executeEvent src
 
 -- wrapper that encodes irc input into desired charset
