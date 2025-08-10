@@ -37,7 +37,7 @@ if (open my $log, '<', $log_file) {
 
 my $html = &fetch_lobster;
 while ($html =~ /<div\ [^>]*?[" ]h-entry">.*?
-	         <div\ [^>]*?[" ]score">[^>\d]*?(\d+)[^>]*?<\/div>.*?
+	         <a\ [^>]*?[" ]upvoter"[^>]*+>(\d+)<\/a>.*?
 		 <a(?=\ [^>]*?class="u-url")[^>]*?\ href="([^">]+)"[^>]*?>([^<]+?)<\/a>.*?
 		 <\/div>\s*<\/div>/sgx) {
 	next unless $1 >= 50;
