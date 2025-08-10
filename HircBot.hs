@@ -486,16 +486,13 @@ executeEvent src param event =
     Join channel  -> do ch <- param channel
                         ircSend C.empty "JOIN" [ch]
     Quit msg      -> param msg >>= quitIrc
-    RandLine fn   -> ircCatch (liftIO (randLine fn) >>= param)
-                              (return . C.pack) >>= reply
+    RandLine fn   -> tryReply (liftIO (randLine fn) >>= param)
     LinesStarting limit fn sepLen find notFound ->
          do findText <- param find
             results <- liftIO (findLinesStarting fn sepLen findText)
             if null results then mapM_ (execute param) notFound
                             else mapM_ reply (take limit results)
-    Calc text     -> do let reply' = reply . C.pack
-                        textParam <- param text
-                        ircCatch (reply' $ calc $ C.unpack $ textParam) reply'
+    Calc text     -> tryReply (C.pack . calc . C.unpack <$> param text)
     Rehash        -> killPlugins >> ircModifyConfig getConfig
     Exec prg args -> mapM param args >>= execToSay replyTo 50 prg
     ExecMaxLines limit prg args ->
@@ -511,6 +508,7 @@ executeEvent src param event =
     Next -> return ()
   where replyTo = fromMaybe (from src) (channel src)
         reply = say replyTo
+        tryReply action = ircCatch action (return . C.pack) >>= reply
         execute = executeEvent src
 
 -- wrapper that encodes irc input into desired charset
