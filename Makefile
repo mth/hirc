@@ -25,9 +25,6 @@ calc: Calculator.hs CalcTest.hs
 convert-conf: ConvertConf.hs
 	ghc -o $@ -W -O2 -XBangPatterns --make $+
 
-acrogrep: acrogrep.c
-	cc -o $@ -W -O2 $+
-
 seen: seen.nim
 	nim c -d:release --gc:none --panics:on seen.nim
 
